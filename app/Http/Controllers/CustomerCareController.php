@@ -9,6 +9,8 @@ use App\Models\AccountType;
 use App\Models\Account;
 use App\Models\KycDocument;
 use App\Models\LedgerEntry;
+use App\Models\Transaction;
+use App\Models\StaffAuditLog;
 use App\Services\LedgerService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Auth;
@@ -579,6 +581,9 @@ class CustomerCareController extends Controller
     public function quickDeposit(Request $request, int $id)
     {
         $account = Account::with('customer')->findOrFail($id);
+        if ($account->is_frozen) {
+            return back()->withErrors(['error' => "Account {$account->account_number} is frozen and cannot receive deposits."]);
+        }
         $request->validate(['amount' => 'required|numeric|min:0.01']);
 
         $staff = Auth::guard('staff')->user();
@@ -602,6 +607,9 @@ class CustomerCareController extends Controller
     public function quickWithdraw(Request $request, int $id)
     {
         $account = Account::with('customer')->findOrFail($id);
+        if ($account->is_frozen) {
+            return back()->withErrors(['error' => "Account {$account->account_number} is frozen and no withdrawals are permitted."]);
+        }
         $request->validate(['amount' => 'required|numeric|min:0.01']);
 
         $staff = Auth::guard('staff')->user();
@@ -625,6 +633,9 @@ class CustomerCareController extends Controller
     public function quickTransfer(Request $request, int $id)
     {
         $fromAccount = Account::with('customer')->findOrFail($id);
+        if ($fromAccount->is_frozen) {
+            return back()->withErrors(['error' => "Account {$fromAccount->account_number} is frozen and cannot initiate transfers."]);
+        }
         $request->validate([
             'to_account' => 'required|exists:accounts,account_number',
             'amount'     => 'required|numeric|min:0.01',
@@ -637,6 +648,10 @@ class CustomerCareController extends Controller
         $toAccount = Account::with('customer')
             ->where('account_number', $request->to_account)
             ->firstOrFail();
+
+        if ($toAccount->is_frozen) {
+            return back()->withErrors(['error' => "Destination account {$toAccount->account_number} is frozen and cannot receive transfers."]);
+        }
 
         $staff = Auth::guard('staff')->user();
         try {
@@ -702,5 +717,102 @@ class CustomerCareController extends Controller
             'customer_name'  => $acc->customer?->full_name ?? '—',
             'status'         => $acc->status,
         ]);
+    }
+
+    /* ── POST /staff/customer-care/accounts/{id}/freeze ── */
+    public function freeze(Request $request, int $id)
+    {
+        $request->validate([
+            'reason' => 'required|string|max:500',
+        ]);
+
+        $account = Account::with('customer')->findOrFail($id);
+        $staff   = Auth::guard('staff')->user();
+
+        if ($account->is_frozen) {
+            return back()->withErrors(['error' => 'This account is already frozen.']);
+        }
+
+        if ($account->status === 'closed') {
+            return back()->withErrors(['error' => 'A closed account cannot be frozen.']);
+        }
+
+        $account->update([
+            'is_frozen'     => true,
+            'frozen_reason' => $request->reason,
+            'frozen_by'     => $staff->id,
+            'frozen_at'     => now(),
+        ]);
+
+        StaffAuditLog::create([
+            'staff_id'       => $staff->id,
+            'branch_id'      => $staff->branch_id,
+            'action'         => 'account_freeze',
+            'description'    => "Froze account {$account->account_number} ({$account->customer?->full_name}). Reason: {$request->reason}",
+            'target_table'   => 'accounts',
+            'target_id'      => $account->id,
+            'ip_address'     => $request->ip(),
+            'result'         => 'success',
+        ]);
+
+        return redirect()
+            ->route('staff.customer-care.profile', $account->customer_id)
+            ->with('success', "Account {$account->account_number} has been frozen.");
+    }
+
+    /* ── POST /staff/customer-care/accounts/{id}/unfreeze ── */
+    public function unfreeze(Request $request, int $id)
+    {
+        $account = Account::with('customer')->findOrFail($id);
+        $staff   = Auth::guard('staff')->user();
+
+        if (!$account->is_frozen) {
+            return back()->withErrors(['error' => 'This account is not frozen.']);
+        }
+
+        $account->update([
+            'is_frozen'     => false,
+            'frozen_reason' => null,
+            'frozen_by'     => null,
+            'frozen_at'     => null,
+        ]);
+
+        StaffAuditLog::create([
+            'staff_id'       => $staff->id,
+            'branch_id'      => $staff->branch_id,
+            'action'         => 'account_unfreeze',
+            'description'    => "Unfroze account {$account->account_number} ({$account->customer?->full_name}).",
+            'target_table'   => 'accounts',
+            'target_id'      => $account->id,
+            'ip_address'     => $request->ip(),
+            'result'         => 'success',
+        ]);
+
+        return redirect()
+            ->route('staff.customer-care.profile', $account->customer_id)
+            ->with('success', "Account {$account->account_number} has been unfrozen.");
+    }
+
+    /* ── GET /staff/transactions/{id}/receipt ── */
+    public function generateReceipt(int $id)
+    {
+        $transaction = Transaction::with([
+            'primaryAccount.customer',
+            'secondaryAccount.customer',
+            'initiator.role',
+            'initiator.branch',
+        ])->findOrFail($id);
+
+        $staff = Auth::guard('staff')->user()->load('role', 'branch');
+
+        $pdf = Pdf::loadView('receipts.transaction', [
+            'transaction' => $transaction,
+            'staff'       => $staff,
+            'printDate'   => now()->format('d M Y'),
+            'printTime'   => now()->format('H:i'),
+        ])->setPaper([0, 0, 226.77, 566.93], 'portrait'); // 80mm wide receipt paper
+
+        $filename = 'receipt-' . $transaction->reference . '.pdf';
+        return $pdf->stream($filename);
     }
 }

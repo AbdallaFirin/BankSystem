@@ -210,6 +210,40 @@ function submitStatus() {
         onSuccess: () => closeStatusModal(),
     })
 }
+
+/* ══════════════════════════════════════════
+   Freeze / Unfreeze Account
+   ══════════════════════════════════════════ */
+const freezeModal   = ref(false)
+const freezeAccount = ref(null)
+const freezeForm    = useForm({ reason: '' })
+
+function openFreezeModal(acc) {
+    freezeAccount.value = acc
+    freezeForm.reset()
+    freezeModal.value   = true
+}
+
+function closeFreezeModal() {
+    freezeModal.value = false
+    freezeAccount.value = null
+    freezeForm.reset()
+}
+
+function submitFreeze() {
+    freezeForm.post(route('staff.customer-care.accounts.freeze', freezeAccount.value.id), {
+        preserveScroll: true,
+        onSuccess: () => closeFreezeModal(),
+    })
+}
+
+const unfreezeForm = useForm({})
+function submitUnfreeze(acc) {
+    if (!confirm(`Unfreeze account ${acc.account_number}? All transactions will be re-enabled.`)) return
+    unfreezeForm.post(route('staff.customer-care.accounts.unfreeze', acc.id), {
+        preserveScroll: true,
+    })
+}
 </script>
 
 <template>
@@ -333,10 +367,16 @@ function submitStatus() {
                                         <p class="font-mono text-sm font-bold text-[#F0EBE1]">{{ acc.account_number }}</p>
                                         <p class="text-xs text-[#A9B8C6] mt-0.5">{{ acc.account_type?.type_name }}</p>
                                     </div>
-                                    <span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border shrink-0"
-                                          :class="statusColor[acc.status] || 'bg-white/5 text-[#6B7E8E] border-white/10'">
-                                        {{ acc.status }}
-                                    </span>
+                                    <div class="flex flex-col items-end gap-1 shrink-0">
+                                        <span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border"
+                                              :class="statusColor[acc.status] || 'bg-white/5 text-[#6B7E8E] border-white/10'">
+                                            {{ acc.status }}
+                                        </span>
+                                        <span v-if="acc.is_frozen"
+                                              class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border bg-blue-900/30 text-blue-300 border-blue-700/40">
+                                            <i class="ti ti-snowflake mr-0.5"></i>Frozen
+                                        </span>
+                                    </div>
                                 </div>
                                 <div class="flex items-center justify-between">
                                     <div>
@@ -374,16 +414,30 @@ function submitStatus() {
                                         <i class="ti ti-arrows-right-left mr-1"></i>Transfer
                                     </button>
                                 </div>
-                                <!-- Row 3: Account management -->
-                                <div class="pt-1.5">
+                                <!-- Row 3: Account management + Freeze -->
+                                <div v-if="acc.is_frozen" class="px-3 py-2 rounded-lg bg-blue-900/20 border border-blue-700/30 text-xs text-blue-300 flex items-start gap-2">
+                                    <i class="ti ti-snowflake shrink-0 mt-0.5"></i>
+                                    <span><strong>Frozen:</strong> {{ acc.frozen_reason }}</span>
+                                </div>
+                                <div class="flex gap-2 pt-1.5">
                                     <button @click="openStatusModal(acc)"
                                             :disabled="acc.status === 'closed'"
-                                            class="w-full py-2 rounded-lg text-xs font-bold transition disabled:opacity-40 disabled:cursor-not-allowed"
+                                            class="flex-1 py-2 rounded-lg text-xs font-bold transition disabled:opacity-40 disabled:cursor-not-allowed"
                                             :class="acc.status === 'suspended'
                                                 ? 'text-amber-400 bg-amber-900/20 border border-amber-700/30 hover:bg-amber-900/40'
                                                 : 'text-slate-400 bg-slate-800/50 border border-slate-700/40 hover:bg-slate-700/60'">
                                         <i :class="acc.status === 'suspended' ? 'ti ti-lock mr-1' : 'ti ti-settings mr-1'"></i>
-                                        {{ acc.status === 'suspended' ? 'Account Suspended — Manage' : 'Manage Account Status' }}
+                                        {{ acc.status === 'suspended' ? 'Suspended' : 'Status' }}
+                                    </button>
+                                    <button v-if="!acc.is_frozen && acc.status !== 'closed'"
+                                            @click="openFreezeModal(acc)"
+                                            class="flex-1 py-2 rounded-lg text-xs font-bold text-blue-300 bg-blue-900/20 border border-blue-700/30 hover:bg-blue-900/40 transition">
+                                        <i class="ti ti-snowflake mr-1"></i>Freeze
+                                    </button>
+                                    <button v-if="acc.is_frozen"
+                                            @click="submitUnfreeze(acc)"
+                                            class="flex-1 py-2 rounded-lg text-xs font-bold text-emerald-400 bg-emerald-900/20 border border-emerald-700/30 hover:bg-emerald-900/40 transition">
+                                        <i class="ti ti-lock-open mr-1"></i>Unfreeze
                                     </button>
                                 </div>
                             </div>
@@ -408,10 +462,16 @@ function submitStatus() {
                                         <td class="px-5 py-3.5 text-sm text-[#A9B8C6] whitespace-nowrap">{{ acc.account_type?.type_name }}</td>
                                         <td class="px-5 py-3.5 text-sm font-mono font-bold text-[#C9A84C] whitespace-nowrap">{{ fmtMoney(acc.balance) }}</td>
                                         <td class="px-5 py-3.5">
-                                            <span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border"
-                                                  :class="statusColor[acc.status] || 'bg-white/5 text-[#6B7E8E] border-white/10'">
-                                                {{ acc.status }}
-                                            </span>
+                                            <div class="flex flex-col gap-1">
+                                                <span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border w-fit"
+                                                      :class="statusColor[acc.status] || 'bg-white/5 text-[#6B7E8E] border-white/10'">
+                                                    {{ acc.status }}
+                                                </span>
+                                                <span v-if="acc.is_frozen"
+                                                      class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border w-fit bg-blue-900/30 text-blue-300 border-blue-700/40">
+                                                    <i class="ti ti-snowflake mr-0.5"></i>Frozen
+                                                </span>
+                                            </div>
                                         </td>
                                         <td class="px-5 py-3.5 text-xs text-[#A9B8C6] whitespace-nowrap">{{ fmtDate(acc.opened_at) }}</td>
                                         <td class="px-5 py-3.5 text-right whitespace-nowrap">
@@ -444,6 +504,16 @@ function submitStatus() {
                                                             : 'text-slate-400 bg-slate-800/50 border border-slate-700/40 hover:bg-slate-700/60'">
                                                     <i :class="acc.status === 'suspended' ? 'ti ti-lock' : 'ti ti-settings'"></i>
                                                     {{ acc.status === 'suspended' ? 'Suspended' : 'Manage' }}
+                                                </button>
+                                                <button v-if="!acc.is_frozen && acc.status !== 'closed'"
+                                                        @click="openFreezeModal(acc)"
+                                                        class="text-[11px] px-2.5 py-1.5 rounded-lg font-bold text-blue-300 bg-blue-900/20 border border-blue-700/30 hover:bg-blue-900/40 transition">
+                                                    <i class="ti ti-snowflake"></i> Freeze
+                                                </button>
+                                                <button v-if="acc.is_frozen"
+                                                        @click="submitUnfreeze(acc)"
+                                                        class="text-[11px] px-2.5 py-1.5 rounded-lg font-bold text-emerald-400 bg-emerald-900/20 border border-emerald-700/30 hover:bg-emerald-900/40 transition">
+                                                    <i class="ti ti-lock-open"></i> Unfreeze
                                                 </button>
                                             </div>
                                         </td>
@@ -815,6 +885,72 @@ function submitStatus() {
                                 {{ statusForm.processing ? 'Updating…'
                                    : statusForm.status   ? 'Confirm ' + allowedTransitions[statusAccount?.status]?.find(o => o.value === statusForm.status)?.label
                                    :                       'Select a Status' }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </Transition>
+    </Teleport>
+
+    <!-- ══════════ Freeze Account Modal ══════════ -->
+    <Teleport to="body">
+        <Transition name="modal">
+            <div v-if="freezeModal"
+                 class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+                <div class="bg-[#112236] border border-blue-700/30 rounded-2xl shadow-2xl w-full max-w-md">
+
+                    <div class="px-6 py-5 border-b border-slate-700/60 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-xl bg-blue-900/40 flex items-center justify-center">
+                                <i class="ti ti-snowflake text-blue-300 text-lg"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-white text-sm">Freeze Account</h3>
+                                <p class="font-mono text-xs text-slate-400 mt-0.5">{{ freezeAccount?.account_number }}</p>
+                            </div>
+                        </div>
+                        <button @click="closeFreezeModal" class="text-slate-400 hover:text-white transition-colors">
+                            <i class="ti ti-x text-lg"></i>
+                        </button>
+                    </div>
+
+                    <div class="px-6 py-5 space-y-4">
+                        <div class="flex items-start gap-3 bg-blue-900/15 border border-blue-700/30 rounded-xl px-4 py-3">
+                            <i class="ti ti-alert-circle text-blue-300 text-base shrink-0 mt-0.5"></i>
+                            <p class="text-xs text-blue-200 leading-relaxed">
+                                Freezing this account will <strong>block all deposits, withdrawals and transfers</strong> immediately.
+                                A reason is required and will be recorded in the audit log.
+                            </p>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                                Freeze Reason <span class="text-blue-400">*</span>
+                            </label>
+                            <textarea v-model="freezeForm.reason" required rows="3"
+                                      class="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white
+                                             placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50 transition-colors resize-none"
+                                      placeholder="e.g. Suspected fraud, AML review, court order, customer dispute…">
+                            </textarea>
+                            <p v-if="freezeForm.errors.reason" class="text-red-400 text-xs mt-1">{{ freezeForm.errors.reason }}</p>
+                        </div>
+
+                        <p v-if="freezeForm.errors.error"
+                           class="text-red-400 text-xs bg-red-900/20 border border-red-700/30 rounded-lg px-3 py-2">
+                            <i class="ti ti-alert-circle mr-1"></i>{{ freezeForm.errors.error }}
+                        </p>
+
+                        <div class="flex gap-3 pt-1">
+                            <button @click="closeFreezeModal"
+                                    class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+                                Cancel
+                            </button>
+                            <button @click="submitFreeze"
+                                    :disabled="!freezeForm.reason.trim() || freezeForm.processing"
+                                    class="flex-1 bg-blue-700 hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
+                                <i :class="freezeForm.processing ? 'ti ti-loader animate-spin' : 'ti ti-snowflake'"></i>
+                                {{ freezeForm.processing ? 'Freezing…' : 'Confirm Freeze' }}
                             </button>
                         </div>
                     </div>

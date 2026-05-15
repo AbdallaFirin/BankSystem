@@ -299,8 +299,12 @@ Route::middleware(['auth:staff'])->group(function () {
     Route::post('/staff/customer-care/accounts/{id}/withdraw', [\App\Http\Controllers\CustomerCareController::class, 'quickWithdraw'])->name('staff.customer-care.quick.withdraw');
     Route::post('/staff/customer-care/accounts/{id}/transfer', [\App\Http\Controllers\CustomerCareController::class, 'quickTransfer'])->name('staff.customer-care.quick.transfer');
     Route::post('/staff/customer-care/accounts/{id}/status',   [\App\Http\Controllers\CustomerCareController::class, 'updateAccountStatus'])->name('staff.customer-care.accounts.status');
+    Route::post('/staff/customer-care/accounts/{id}/freeze',   [\App\Http\Controllers\CustomerCareController::class, 'freeze'])->name('staff.customer-care.accounts.freeze');
+    Route::post('/staff/customer-care/accounts/{id}/unfreeze', [\App\Http\Controllers\CustomerCareController::class, 'unfreeze'])->name('staff.customer-care.accounts.unfreeze');
     // Lookup account number → return customer name (AJAX)
     Route::get('/staff/customer-care/lookup-account',          [\App\Http\Controllers\CustomerCareController::class, 'lookupAccount'] )->name('staff.customer-care.lookup-account');
+    // Transaction receipt PDF
+    Route::get('/staff/transactions/{id}/receipt',             [\App\Http\Controllers\CustomerCareController::class, 'generateReceipt'])->name('staff.transaction.receipt');
 
     // Compliance Operations
     Route::get('/staff/compliance', [\App\Http\Controllers\ComplianceController::class, 'index'])->name('staff.compliance.index');

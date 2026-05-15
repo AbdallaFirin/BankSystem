@@ -396,6 +396,7 @@ watch(() => [stmt.date_from, stmt.date_to], () => { activePreset.value = '' })
                                         <i :class="'ti ' + sortIcon('balance_after') + ' text-sm'"></i>
                                     </button>
                                 </th>
+                                <th class="px-5 py-3 text-right font-bold text-xs uppercase tracking-wide text-slate-400"></th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-800">
@@ -420,9 +421,18 @@ watch(() => [stmt.date_from, stmt.date_to], () => { activePreset.value = '' })
                                 <td class="px-5 py-3 text-right font-mono text-white text-sm">
                                     {{ fmt(entry.balance_after) }}
                                 </td>
+                                <td class="px-4 py-3 text-right">
+                                    <a v-if="entry.transaction?.id"
+                                       :href="route('staff.transaction.receipt', entry.transaction.id)"
+                                       target="_blank" rel="noopener"
+                                       title="Print Receipt"
+                                       class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-[#C9A84C] hover:border-[#C9A84C]/30 hover:bg-[#C9A84C]/8 transition-colors">
+                                        <i class="ti ti-receipt text-xs"></i>
+                                    </a>
+                                </td>
                             </tr>
                             <tr v-if="!entries.data.length">
-                                <td colspan="5" class="px-5 py-14 text-center">
+                                <td colspan="6" class="px-5 py-14 text-center">
                                     <i class="ti ti-history text-3xl text-slate-600 block mb-3"></i>
                                     <p class="text-sm text-slate-500">No transactions match your filters</p>
                                 </td>

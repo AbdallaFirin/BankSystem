@@ -9,6 +9,10 @@ class Account extends Model
     protected $table = 'accounts';
     protected $guarded = [];
     protected $appends = ['balance'];
+    protected $casts = [
+        'is_frozen' => 'boolean',
+        'frozen_at' => 'datetime',
+    ];
 
     /**
      * Dynamically compute balance: SUM(Credits) - SUM(Debits).
@@ -44,5 +48,10 @@ class Account extends Model
     public function ledgerEntries()
     {
         return $this->hasMany(LedgerEntry::class);
+    }
+
+    public function frozenBy()
+    {
+        return $this->belongsTo(Staff::class, 'frozen_by');
     }
 }
