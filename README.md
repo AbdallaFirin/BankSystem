@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <div align="center">
 
 <img src="public/images/MAin Logo.png" alt="Gobaad Bank Logo" width="100" />
@@ -327,3 +328,7 @@ For academic and educational use only — not licensed for commercial deployment
   <br/>
   <sub><em>Gobaad Bank Management System — Final Year Project</em></sub>
 </div>
+=======
+# BankSystem
+The Gobaad Bank Management System (BMS) is a full-stack web application built for Gobaad Bank to manage the complete operations of a multi-branch bank. It provides secure, role-based access to three categories of users: System Administrators, Bank Staff, and Customers.
+>>>>>>> 641074ec194da1e60a7a9efc0cfcd8e2106c4905
