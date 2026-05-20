@@ -466,7 +466,8 @@ tr.rev td { color: #b0b8c4; text-decoration: line-through; }
                 @endif
             </td>
             <td align="right" style="font-size:9px; color:#85B7EB;">
-                Gobaad Bank &nbsp;&middot;&nbsp; {{ $branchName }}@if(!empty($account->homeBranch->swift_code)) &nbsp;&middot;&nbsp; SWIFT: {{ $account->homeBranch->swift_code }}@endif@if(!empty($account->homeBranch->phone)) &nbsp;&middot;&nbsp; {{ $account->homeBranch->phone }}@endif
+                Gobaad Bank &nbsp;&middot;&nbsp; {{ $branchName }}@if(!empty($account->homeBranch->swift_code)) &nbsp;&middot;&nbsp; SWIFT: {{ $account->homeBranch->swift_code }}@endif
+                @if(!empty($account->homeBranch->phone)) &nbsp;&middot;&nbsp; {{ $account->homeBranch->phone }}@endif
             </td>
         </tr>
     </table>

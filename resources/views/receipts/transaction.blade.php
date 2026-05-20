@@ -173,6 +173,7 @@ body {
         'rejected'         => 'Rejected',
         default            => ucfirst($txn->status ?? '—'),
     };
+    $receiptSwift = $txn->initiator?->branch?->swift_code ?? '';
 @endphp
 
 <!-- Header -->
@@ -259,10 +260,10 @@ body {
     <span class="field-label">Branch</span>
     <span class="field-value">{{ $txn->initiator?->branch?->branch_name ?? '—' }}</span>
 </div>
-@if($txn->initiator?->branch?->swift_code)
+@if($receiptSwift)
 <div class="field-row">
     <span class="field-label">SWIFT Code</span>
-    <span class="field-value mono">{{ $txn->initiator->branch->swift_code }}</span>
+    <span class="field-value mono">{{ $receiptSwift }}</span>
 </div>
 @endif
 <div class="field-row">
@@ -310,7 +311,7 @@ body {
 <div class="footer">
     <div class="footer-ref">Ref: {{ $txn->reference }}</div>
     <div class="footer-note">Please retain this receipt for your records.</div>
-    <div class="footer-note">Gobaad Bank · All amounts in USD@if($txn->initiator?->branch?->swift_code) · SWIFT: {{ $txn->initiator->branch->swift_code }}@endif</div>
+    <div class="footer-note">Gobaad Bank · All amounts in USD{{ $receiptSwift ? ' · SWIFT: '.$receiptSwift : '' }}</div>
 </div>
 
 </body>
