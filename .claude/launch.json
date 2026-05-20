@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "slides",
+      "runtimeExecutable": "php",
+      "runtimeArgs": ["-S", "localhost:8888", "-t", "public"],
+      "port": 8888
+    }
+  ]
+}

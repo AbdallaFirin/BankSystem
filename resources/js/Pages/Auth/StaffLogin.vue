@@ -26,7 +26,7 @@ const submit = () => {
 
       <!-- Logo -->
       <div class="flex items-center gap-3 mb-8">
-        <img src="/storage/images/MAin Logo.png" alt="Gobaad Bank" class="h-10 w-auto object-contain shrink-0" />
+        <img src="/images/MAin Logo.png" alt="Gobaad Bank" class="h-10 w-auto object-contain shrink-0" />
         <span class="font-serif text-[#C9A84C] tracking-wide text-lg whitespace-nowrap">Gobaad Bank</span>
       </div>
 
@@ -80,10 +80,15 @@ const submit = () => {
         </button>
       </form>
 
-      <!-- Hint -->
-      <p class="mt-6 text-center text-[11px] text-[#4a5f70]">
-        Your Staff ID was issued when your account was created.<br>Contact your administrator if you've forgotten it.
-      </p>
+      <!-- Forgot password + hint -->
+      <div class="mt-6 text-center space-y-2">
+        <a href="/forgot-password" class="text-[12px] text-[#C9A84C]/70 hover:text-[#C9A84C] transition-colors font-medium">
+          Forgot your password?
+        </a>
+        <p class="text-[11px] text-[#4a5f70]">
+          Your Staff ID was issued when your account was created.
+        </p>
+      </div>
     </div>
   </div>
 </template>

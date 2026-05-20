@@ -17,6 +17,7 @@ const reviewForm = useForm({});
 
 const submit = () => {
     form.post(route('staff.customer-care.upload-kyc', props.customer.id), {
+        forceFormData: true,
         onSuccess: () => form.reset(),
     });
 };
@@ -71,9 +72,21 @@ const alreadySubmitted = computed(() =>
       </div>
 
       <!-- Alerts -->
-      <div v-if="flash.success" class="bg-[rgba(76,175,125,0.1)] border border-[#4CAF7D] text-[#4CAF7D] p-4 rounded-lg mb-8 flex items-center gap-3">
+      <div v-if="flash.success || $page.props.flash?.success"
+           class="bg-[rgba(76,175,125,0.1)] border border-[#4CAF7D] text-[#4CAF7D] p-4 rounded-lg mb-8 flex items-center gap-3">
         <i class="ti ti-check-circle"></i>
-        <span class="text-sm">{{ flash.success }}</span>
+        <span class="text-sm">{{ flash.success || $page.props.flash?.success }}</span>
+      </div>
+      <div v-if="$page.props.flash?.error"
+           class="bg-[rgba(226,99,90,0.1)] border border-[#E2635A] text-[#E2635A] p-4 rounded-lg mb-8 flex items-center gap-3">
+        <i class="ti ti-alert-circle"></i>
+        <span class="text-sm">{{ $page.props.flash.error }}</span>
+      </div>
+      <!-- Validation errors (e.g., wrong file type or size) -->
+      <div v-if="form.errors.doc_type || form.errors.file"
+           class="bg-[rgba(226,99,90,0.08)] border border-[rgba(226,99,90,0.3)] text-[#E2635A] p-4 rounded-lg mb-8 space-y-1">
+        <p v-if="form.errors.doc_type" class="text-sm flex items-center gap-2"><i class="ti ti-alert-triangle"></i>{{ form.errors.doc_type }}</p>
+        <p v-if="form.errors.file"     class="text-sm flex items-center gap-2"><i class="ti ti-alert-triangle"></i>{{ form.errors.file }}</p>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-8">

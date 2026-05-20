@@ -197,6 +197,77 @@ class TellerController extends Controller
         ]);
     }
 
+    /* ─────────────── TRANSACTION HISTORY PAGE ─────────────── */
+    public function historyPage(Request $request)
+    {
+        $staff = Auth::guard('staff')->user();
+
+        $query = Transaction::where('initiated_by', $staff->id)
+            ->orderBy('created_at', 'desc');
+
+        if ($request->filled('type')) {
+            $query->where('type', $request->type);
+        }
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+
+        $paginated = $query->paginate(20)->withQueryString();
+
+        $paginated->getCollection()->transform(function ($txn) {
+            $txn->can_reverse = $txn->status === 'completed'
+                && !$txn->is_reversed
+                && is_null($txn->reversal_of);
+
+            $entries = LedgerEntry::with('account.customer')
+                ->where('transaction_id', $txn->id)
+                ->get();
+
+            if ($txn->type === 'deposit') {
+                $acc = $entries->firstWhere('entry_type', 'credit')?->account;
+                $txn->customer_name  = $acc?->customer?->full_name ?? '—';
+                $txn->account_number = $acc?->account_number ?? '—';
+            } elseif ($txn->type === 'withdrawal') {
+                $acc = $entries->firstWhere('entry_type', 'debit')?->account;
+                $txn->customer_name  = $acc?->customer?->full_name ?? '—';
+                $txn->account_number = $acc?->account_number ?? '—';
+            } elseif ($txn->type === 'transfer') {
+                $from = $entries->firstWhere('entry_type', 'debit')?->account;
+                $to   = $entries->firstWhere('entry_type', 'credit')?->account;
+                $txn->customer_name  = $from?->customer?->full_name ?? '—';
+                $txn->account_number = $from?->account_number ?? '—';
+                $txn->to_account_number = $to?->account_number ?? '—';
+                $txn->to_customer       = $to?->customer?->full_name ?? '—';
+            }
+
+            return $txn;
+        });
+
+        // Summary counts for today
+        $todaySummary = Transaction::where('initiated_by', $staff->id)
+            ->whereDate('created_at', today())
+            ->selectRaw("type, COUNT(*) as cnt, COALESCE(SUM(amount),0) as total")
+            ->groupBy('type')
+            ->get()
+            ->keyBy('type');
+
+        return Inertia::render('Staff/Teller/TransactionHistory', [
+            'history'      => $paginated,
+            'filters'      => $request->only('type', 'status', 'date_from', 'date_to'),
+            'today_summary' => [
+                'deposit'    => ['count' => $todaySummary['deposit']->cnt    ?? 0, 'total' => $todaySummary['deposit']->total    ?? 0],
+                'withdrawal' => ['count' => $todaySummary['withdrawal']->cnt ?? 0, 'total' => $todaySummary['withdrawal']->total ?? 0],
+                'transfer'   => ['count' => $todaySummary['transfer']->cnt   ?? 0, 'total' => $todaySummary['transfer']->total   ?? 0],
+            ],
+        ]);
+    }
+
     /* ─────────────── DEPOSIT PAGE ─────────────── */
     public function depositPage(Request $request)
     {

@@ -10,8 +10,10 @@ use App\Models\Account;
 use App\Models\KycDocument;
 use App\Models\LedgerEntry;
 use App\Models\Transaction;
+use App\Models\AccountFreezeLog;
 use App\Models\StaffAuditLog;
 use App\Services\LedgerService;
+use App\Services\NotificationService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -19,17 +21,21 @@ use Illuminate\Support\Str;
 
 class CustomerCareController extends Controller
 {
-    public function __construct(private LedgerService $ledgerService) {}
+    public function __construct(
+        private LedgerService        $ledgerService,
+        private NotificationService  $notificationService
+    ) {}
 
     public function create()
     {
-        // Get unique account types by name to avoid duplicates in UI
+        $staff = Auth::guard('staff')->user()->load('branch');
+
         $accountTypes = AccountType::where('is_active', true)
             ->get()
             ->unique('type_name');
 
         return \Inertia\Inertia::render('Staff/CustomerCare/Register', [
-            'branches' => Branch::where('status', 'active')->get(),
+            'staff_branch' => $staff->branch,
             'accountTypes' => $accountTypes->values(),
         ]);
     }
@@ -43,20 +49,37 @@ class CustomerCareController extends Controller
     }
 
     /**
-     * Generate a unique 12-digit account number.
-     * Format: [3-letter branch prefix][3-digit branch ID][6-digit sequence]
-     * Example: CAR002000001
+     * Generate a unique account number.
+     * Format: [3-letter branch prefix][6-digit sequence starting from 120]
+     * Example: CAR000120, CAR000121
      */
     private function generateAccountNumber(int $branchId): string
     {
         $branch = Branch::findOrFail($branchId);
-        $prefix = strtoupper(substr(preg_replace('/[^a-zA-Z]/', '', $branch->branch_name), 0, 3));
-        $branchPart = str_pad($branchId, 3, '0', STR_PAD_LEFT);
 
-        $existingCount = Account::where('home_branch_id', $branchId)->count();
+        // Use the branch full_code (prefix + auto-number, e.g. "BOS103").
+        // Fall back to the 3-letter name slice if no code is set yet.
+        $prefix = $branch->full_code
+            ?: strtoupper(substr(preg_replace('/[^a-zA-Z]/', '', $branch->branch_name), 0, 3));
+
+        // Count only real customer accounts for this branch (exclude system accounts).
+        $existingCount = Account::where('home_branch_id', $branchId)
+            ->where('account_number', 'not like', 'VAULT-%')
+            ->where('account_number', 'not like', 'TILL-%')
+            ->count();
+
+        // Sequence is zero-padded 6 digits, starting from 000001.
         $sequence = str_pad($existingCount + 1, 6, '0', STR_PAD_LEFT);
 
-        return $prefix . $branchPart . $sequence;
+        // Guarantee uniqueness (collision-safe loop).
+        $candidate = $prefix . $sequence;
+        while (Account::where('account_number', $candidate)->exists()) {
+            $existingCount++;
+            $sequence  = str_pad($existingCount + 1, 6, '0', STR_PAD_LEFT);
+            $candidate = $prefix . $sequence;
+        }
+
+        return $candidate;
     }
 
     private function getVaultAccount(int $branchId): Account
@@ -251,14 +274,39 @@ class CustomerCareController extends Controller
         return $pdf->download($filename);
     }
 
-    public function accountsIndex()
+    public function accountsIndex(Request $request)
     {
-        $accounts = Account::with(['customer', 'accountType', 'homeBranch'])
+        $query = Account::with(['customer', 'accountType', 'homeBranch'])
             ->where('account_number', 'not like', 'VAULT-%')
             ->where('account_number', 'not like', 'TILL-%')
-            ->where('account_number', 'not like', 'SYS-%')
-            ->orderBy('created_at', 'desc')
-            ->paginate(20);
+            ->where('account_number', 'not like', 'SYS-%');
+
+        if ($request->filled('search')) {
+            $s = $request->search;
+            $query->where(function ($q) use ($s) {
+                $q->where('account_number', 'like', "%{$s}%")
+                  ->orWhereHas('customer', fn ($cq) =>
+                      $cq->where('full_name', 'like', "%{$s}%")
+                         ->orWhere('phone', 'like', "%{$s}%")
+                  );
+            });
+        }
+
+        if ($request->filled('branch_id')) {
+            $query->where('home_branch_id', $request->branch_id);
+        }
+
+        if ($request->filled('status')) {
+            if ($request->status === 'frozen') {
+                $query->where('is_frozen', true);
+            } else {
+                $query->where('status', $request->status)->where('is_frozen', false);
+            }
+        }
+
+        $accounts = $query->orderBy('created_at', 'desc')
+            ->paginate(20)
+            ->withQueryString();
 
         // Append live balance from ledger entries
         $accounts->getCollection()->transform(function ($account) {
@@ -270,6 +318,8 @@ class CustomerCareController extends Controller
 
         return \Inertia\Inertia::render('Staff/CustomerCare/Accounts', [
             'accounts' => $accounts,
+            'branches' => \App\Models\Branch::orderBy('branch_name')->get(['id', 'branch_name']),
+            'filters'  => $request->only('search', 'branch_id', 'status'),
         ]);
     }
 
@@ -382,8 +432,6 @@ class CustomerCareController extends Controller
             
             // Account Selection
             'account_type_id' => 'required|exists:account_types,id',
-            'home_branch_id' => 'required|exists:branches,id',
-            'initial_deposit' => 'nullable|numeric|min:0',
         ]);
 
         try {
@@ -403,6 +451,7 @@ class CustomerCareController extends Controller
                 
                 $customer = Customer::create(array_merge($customerData, [
                     'full_name' => $validated['first_name'] . ' ' . ($validated['middle_name'] ? $validated['middle_name'] . ' ' : '') . $validated['last_name'],
+                    'home_branch_id' => $staff->branch_id,
                     'registered_by' => $staff->id,
                     'kyc_status' => 'pending',
                 ]));
@@ -411,8 +460,8 @@ class CustomerCareController extends Controller
                 $account = Account::create([
                     'customer_id' => $customer->id,
                     'account_type_id' => $validated['account_type_id'],
-                    'home_branch_id' => $validated['home_branch_id'], // Fixed: was branch_id
-                    'account_number' => 'ACC-' . strtoupper(Str::random(8)),
+                    'home_branch_id' => $staff->branch_id,
+                    'account_number' => $this->generateAccountNumber($staff->branch_id),
                     'status' => 'inactive',
                 ]);
 
@@ -427,6 +476,16 @@ class CustomerCareController extends Controller
     public function customersIndex(Request $request)
     {
         $query = Customer::with(['branch', 'accounts'])
+            ->whereNotIn('id', function ($q) {
+                // Exclude internal/vault/till pseudo-customers
+                $q->select('customer_id')->from('accounts')
+                  ->where(function ($aq) {
+                      $aq->where('account_number', 'like', 'VAULT-%')
+                         ->orWhere('account_number', 'like', 'TILL-%')
+                         ->orWhere('account_number', 'like', 'SYS-%');
+                  });
+            })
+            ->where('id_type', '!=', 'Internal')
             ->orderBy('created_at', 'desc');
 
         if ($request->filled('search')) {
@@ -443,11 +502,16 @@ class CustomerCareController extends Controller
             $query->where('kyc_status', $request->kyc_status);
         }
 
+        if ($request->filled('branch_id')) {
+            $query->where('home_branch_id', $request->branch_id);
+        }
+
         $customers = $query->paginate(20)->withQueryString();
 
         return \Inertia\Inertia::render('Staff/CustomerCare/Customers', [
             'customers' => $customers,
-            'filters'   => $request->only('search', 'kyc_status'),
+            'branches'  => \App\Models\Branch::orderBy('branch_name')->get(['id', 'branch_name']),
+            'filters'   => $request->only('search', 'kyc_status', 'branch_id'),
         ]);
     }
 
@@ -458,11 +522,41 @@ class CustomerCareController extends Controller
             'registeredBy',
             'kycDocuments',
             'accounts.accountType',
+            'accounts.freezeLogs.performedBy',
         ])->findOrFail($id);
 
         return \Inertia\Inertia::render('Staff/CustomerCare/CustomerProfile', [
             'customer' => $customer,
+            'branches' => \App\Models\Branch::orderBy('branch_name')->get(['id', 'branch_name']),
         ]);
+    }
+
+    public function updateCustomer(Request $request, $id)
+    {
+        $customer = Customer::findOrFail($id);
+
+        $validated = $request->validate([
+            'phone'                => 'required|string|max:20',
+            'secondary_phone'      => 'nullable|string|max:20',
+            'email'                => 'nullable|email|max:255',
+            'region_city'          => 'nullable|string|max:100',
+            'district'             => 'nullable|string|max:100',
+            'street_neighbourhood' => 'nullable|string|max:100',
+            'address'              => 'nullable|string|max:500',
+            'employment_status'    => 'nullable|string|max:100',
+            'employer_name'        => 'nullable|string|max:200',
+            'monthly_income_range' => 'nullable|string|max:100',
+            'source_of_funds'      => 'nullable|string|max:200',
+            'expected_monthly_transactions' => 'nullable|string|max:100',
+            'next_of_kin_name'     => 'nullable|string|max:200',
+            'next_of_kin_relation' => 'nullable|string|max:100',
+            'next_of_kin_phone'    => 'nullable|string|max:20',
+            'preferred_contact_method' => 'nullable|string|max:50',
+        ]);
+
+        $customer->update($validated);
+
+        return back()->with('success', "Customer information updated successfully.");
     }
 
     public function kyc($id)
@@ -744,6 +838,34 @@ class CustomerCareController extends Controller
             'frozen_at'     => now(),
         ]);
 
+        // Persist freeze history entry
+        AccountFreezeLog::create([
+            'account_id'   => $account->id,
+            'action'       => 'freeze',
+            'performed_by' => $staff->id,
+            'reason'       => $request->reason,
+        ]);
+
+        // Notify customer
+        $customer = $account->customer;
+        if ($customer) {
+            $this->notificationService->send(
+                recipientId:   $customer->id,
+                recipientType: 'customer',
+                message:       "Your account {$account->account_number} has been frozen. Reason: {$request->reason}",
+                subject:       'Your Account Has Been Frozen',
+                mailView:      'account-freeze-status',
+                mailData:      [
+                    'customerName'  => $customer->full_name,
+                    'accountNumber' => $account->account_number,
+                    'accountType'   => $account->accountType?->type_name ?? '—',
+                    'action'        => 'freeze',
+                    'actionAt'      => now()->format('d M Y, H:i:s'),
+                    'reason'        => $request->reason,
+                ]
+            );
+        }
+
         StaffAuditLog::create([
             'staff_id'       => $staff->id,
             'branch_id'      => $staff->branch_id,
@@ -763,6 +885,10 @@ class CustomerCareController extends Controller
     /* ── POST /staff/customer-care/accounts/{id}/unfreeze ── */
     public function unfreeze(Request $request, int $id)
     {
+        $request->validate([
+            'notes' => 'nullable|string|max:500',
+        ]);
+
         $account = Account::with('customer')->findOrFail($id);
         $staff   = Auth::guard('staff')->user();
 
@@ -770,18 +896,47 @@ class CustomerCareController extends Controller
             return back()->withErrors(['error' => 'This account is not frozen.']);
         }
 
+        // Keep frozen_reason on the account as historical reference;
+        // only clear the active-freeze flags.
         $account->update([
-            'is_frozen'     => false,
-            'frozen_reason' => null,
-            'frozen_by'     => null,
-            'frozen_at'     => null,
+            'is_frozen' => false,
+            'frozen_by' => null,
+            'frozen_at' => null,
         ]);
+
+        // Persist unfreeze history entry
+        AccountFreezeLog::create([
+            'account_id'   => $account->id,
+            'action'       => 'unfreeze',
+            'performed_by' => $staff->id,
+            'notes'        => $request->notes,
+        ]);
+
+        // Notify customer
+        $customer = $account->customer;
+        if ($customer) {
+            $this->notificationService->send(
+                recipientId:   $customer->id,
+                recipientType: 'customer',
+                message:       "Your account {$account->account_number} has been unfrozen. All banking services have been restored.",
+                subject:       'Your Account Has Been Unfrozen',
+                mailView:      'account-freeze-status',
+                mailData:      [
+                    'customerName'  => $customer->full_name,
+                    'accountNumber' => $account->account_number,
+                    'accountType'   => $account->accountType?->type_name ?? '—',
+                    'action'        => 'unfreeze',
+                    'actionAt'      => now()->format('d M Y, H:i:s'),
+                    'notes'         => $request->notes,
+                ]
+            );
+        }
 
         StaffAuditLog::create([
             'staff_id'       => $staff->id,
             'branch_id'      => $staff->branch_id,
             'action'         => 'account_unfreeze',
-            'description'    => "Unfroze account {$account->account_number} ({$account->customer?->full_name}).",
+            'description'    => "Unfroze account {$account->account_number} ({$account->customer?->full_name})." . ($request->notes ? " Notes: {$request->notes}" : ''),
             'target_table'   => 'accounts',
             'target_id'      => $account->id,
             'ip_address'     => $request->ip(),
@@ -791,6 +946,48 @@ class CustomerCareController extends Controller
         return redirect()
             ->route('staff.customer-care.profile', $account->customer_id)
             ->with('success', "Account {$account->account_number} has been unfrozen.");
+    }
+
+    /* ── POST /staff/customer-care/customers/{id}/send-portal-access ── */
+    public function sendPortalAccess(int $id)
+    {
+        $customer = Customer::findOrFail($id);
+
+        if ($customer->kyc_status !== 'verified') {
+            return back()->withErrors(['error' => 'Portal access can only be granted to KYC-verified customers.']);
+        }
+
+        if (empty($customer->email)) {
+            return back()->withErrors(['error' => "Cannot send portal access: {$customer->full_name} has no email address on record. Please update their profile with a valid email first."]);
+        }
+
+        // Build and store a fresh temp password
+        $birthYear    = $customer->dob ? date('Y', strtotime($customer->dob)) : date('Y');
+        $tempPassword = substr(preg_replace('/\D/', '', $customer->phone), -4) . $birthYear;
+
+        $customer->update([
+            'password'             => \Illuminate\Support\Facades\Hash::make($tempPassword),
+            'must_change_password' => true,
+        ]);
+
+        // Send notification + email
+        $this->notificationService->send(
+            recipientId:   $customer->id,
+            recipientType: 'customer',
+            message:       'Your Gobaad Bank customer portal access has been set up. Log in with your phone number and the temporary password sent to your email.',
+            subject:       'Customer Portal Access — Temporary Password',
+            mailView:      'kyc-status',
+            mailData:      [
+                'customerName' => $customer->full_name,
+                'customerId'   => $customer->id,
+                'phone'        => $customer->phone,
+                'status'       => 'approved',
+                'decidedAt'    => now()->format('d M Y, H:i:s'),
+                'tempPassword' => $tempPassword,
+            ]
+        );
+
+        return back()->with('success', "Portal access sent to {$customer->full_name}. Temporary password emailed to {$customer->email}.");
     }
 
     /* ── GET /staff/transactions/{id}/receipt ── */

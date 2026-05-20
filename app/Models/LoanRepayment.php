@@ -6,5 +6,5 @@ use Illuminate\Database\Eloquent\Model;
 
 class LoanRepayment extends Model
 {
-    //
+    // Future enhancement — not yet implemented
 }

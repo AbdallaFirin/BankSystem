@@ -13,13 +13,20 @@ const selectedCustomer = ref(null);
 const showRejectModal  = ref(false);
 const rejectTarget     = ref(null);
 
-const approveForm = useForm({});
-const rejectForm  = useForm({ rejection_reason: '' });
+const approveForm   = useForm({});
+const rejectForm    = useForm({ rejection_reason: '' });
+const approveTarget = ref(null);
+const showApproveModal = ref(false);
 
-const approve = (customer) => {
-    if (confirm(`Approve ${customer.full_name} and activate their accounts?`)) {
-        approveForm.post(route('staff.compliance.approve-kyc', customer.id));
-    }
+const openApprove = (customer) => {
+    approveTarget.value   = customer;
+    showApproveModal.value = true;
+};
+
+const confirmApprove = () => {
+    approveForm.post(route('staff.compliance.approve-kyc', approveTarget.value.id), {
+        onSuccess: () => { showApproveModal.value = false; }
+    });
 };
 
 const openReject = (customer) => {
@@ -148,8 +155,8 @@ const docTypeIcon = (path) => {
                       class="flex-1 md:flex-none px-4 py-2 rounded-lg bg-[rgba(255,255,255,0.05)] text-[#A9B8C6] text-sm hover:bg-[rgba(255,255,255,0.1)] transition whitespace-nowrap">
                 Docs ({{ customer.kyc_documents.length }})
               </button>
-              <button @click="approve(customer)"
-                      class="w-10 h-10 rounded-lg bg-[rgba(76,175,125,0.1)] text-[#4CAF7D] hover:bg-[#4CAF7D] hover:text-white transition flex items-center justify-center" title="Approve">
+              <button @click="openApprove(customer)"
+                      class="w-10 h-10 rounded-lg bg-[rgba(76,175,125,0.1)] text-[#4CAF7D] hover:bg-[#4CAF7D] hover:text-white transition flex items-center justify-center" title="Approve KYC">
                 <i class="ti ti-check"></i>
               </button>
               <button @click="openReject(customer)"
@@ -345,6 +352,62 @@ const docTypeIcon = (path) => {
           <div class="shrink-0 flex items-center justify-center gap-4 py-1.5 text-[10px] text-[#6B7E8E]">
             <span><kbd class="px-1 py-0.5 rounded bg-white/5 font-mono">←</kbd> <kbd class="px-1 py-0.5 rounded bg-white/5 font-mono">→</kbd> Navigate</span>
             <span><kbd class="px-1 py-0.5 rounded bg-white/5 font-mono">Esc</kbd> Close</span>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- ═══════════════════════════════════════════════════
+         APPROVE CONFIRMATION MODAL
+    ════════════════════════════════════════════════════ -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="showApproveModal" class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div class="bg-[#0B1929] border border-emerald-700/30 w-full max-w-md rounded-2xl p-8 shadow-2xl">
+            <div class="flex items-center gap-3 mb-5">
+              <div class="w-12 h-12 rounded-full bg-emerald-900/40 flex items-center justify-center">
+                <i class="ti ti-shield-check text-2xl text-emerald-400"></i>
+              </div>
+              <div>
+                <h2 class="text-xl font-bold text-white">Approve KYC</h2>
+                <p class="text-sm text-slate-400 mt-0.5">This action will activate the customer's accounts</p>
+              </div>
+            </div>
+
+            <div v-if="approveTarget" class="bg-slate-800/60 border border-slate-700/40 rounded-xl px-4 py-3 mb-5 space-y-1.5">
+              <div class="flex justify-between text-sm">
+                <span class="text-slate-400">Customer</span>
+                <span class="text-white font-medium">{{ approveTarget.full_name }}</span>
+              </div>
+              <div class="flex justify-between text-sm">
+                <span class="text-slate-400">ID Number</span>
+                <span class="text-white font-mono">{{ approveTarget.id_number }}</span>
+              </div>
+              <div class="flex justify-between text-sm">
+                <span class="text-slate-400">Documents</span>
+                <span class="text-white">{{ approveTarget.kyc_documents?.length ?? 0 }} uploaded</span>
+              </div>
+            </div>
+
+            <p class="text-xs text-slate-400 mb-5">
+              A temporary password will be generated and emailed to the customer. They will be required to change it on first login.
+            </p>
+
+            <div class="flex gap-3">
+              <button @click="confirmApprove" :disabled="approveForm.processing"
+                      class="flex-1 flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition">
+                <svg v-if="approveForm.processing" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+                <i v-else class="ti ti-check"></i>
+                {{ approveForm.processing ? 'Approving…' : 'Confirm Approval' }}
+              </button>
+              <button @click="showApproveModal = false" :disabled="approveForm.processing"
+                      class="px-5 py-3 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 font-semibold text-sm transition-colors disabled:opacity-40">
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       </Transition>

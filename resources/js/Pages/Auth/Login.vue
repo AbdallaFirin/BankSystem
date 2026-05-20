@@ -96,5 +96,17 @@ const submit = () => {
                 </PrimaryButton>
             </div>
         </form>
+
+        <!-- Customer portal link -->
+        <div class="mt-6 pt-5 border-t border-gray-200 text-center">
+            <p class="text-xs text-gray-500 mb-2">Are you a bank customer?</p>
+            <Link
+                :href="route('customer.login')"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0B1929] text-[#C9A84C] text-sm font-semibold hover:bg-[#1a3a5c] transition-colors"
+            >
+                <i class="ti ti-user-circle text-base"></i>
+                Customer Portal Login
+            </Link>
+        </div>
     </GuestLayout>
 </template>

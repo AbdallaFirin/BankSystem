@@ -2,7 +2,23 @@
   "permissions": {
     "allow": [
       "Bash(npm run *)",
-      "Bash(php artisan *)"
+      "Bash(php artisan *)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__0939c4e1-2264-4af1-bfe3-2bcb7f2f9518__request-outline-review",
+      "mcp__Claude_in_Chrome__browser_batch",
+      "mcp__Claude_in_Chrome__navigate",
+      "mcp__Claude_in_Chrome__computer",
+      "Bash(dir /s /b \"C:\\\\Users\\\\DELL\\\\Downloads\\\\ss_*.jpeg\")",
+      "Bash(dir /s /b \"C:\\\\Users\\\\DELL\\\\Downloads\\\\ss_*\")",
+      "Bash(dir /s /b \"C:\\\\Users\\\\DELL\\\\Downloads\")",
+      "Bash(dir /s /b \"C:\\\\Users\\\\DELL\\\\AppData\\\\Roaming\")",
+      "Bash(findstr \"ss_\")",
+      "mcp__Claude_in_Chrome__javascript_tool",
+      "Bash(dir \"C:\\\\Users\\\\DELL\\\\Documents\\\\BankManagement\\\\BankSystem\\\\public\\\\slides\\\\screenshots\\\\slide_*.png\")",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\DELL\\\\Documents\\\\BankManagement\\\\BankSystem\\\\public\\\\slides\\\\screenshots\\\\\" | Select-Object Name, @{N='Size_KB';E={[math]::Round\\($_.Length/1KB,1\\)}})",
+      "Bash(New-Item -Path \"C:\\\\Users\\\\DELL\\\\Documents\\\\BankManagement\\\\BankSystem\\\\resources\\\\views\\\\mail\\\\otp-code.blade.php\" -ItemType File -Force)",
+      "Bash(Out-Null)",
+      "Bash(pip install *)"
     ]
   }
 }

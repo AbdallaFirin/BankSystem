@@ -1,10 +1,27 @@
 <script setup>
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, router } from '@inertiajs/vue3';
+import { reactive, watch } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 
 const props = defineProps({
-    customers: Object, // Paginated
-    flash: Object
+    customers: Object,
+    branches:  { type: Array, default: () => [] },
+    filters:   { type: Object, default: () => ({}) },
+    flash:     Object,
+});
+
+const filters = reactive({
+    search:     props.filters.search     ?? '',
+    kyc_status: props.filters.kyc_status ?? '',
+    branch_id:  props.filters.branch_id  ?? '',
+});
+
+let debounce = null;
+watch(filters, () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(() => {
+        router.get(route('staff.admin.customers.index'), { ...filters }, { preserveState: true, replace: true });
+    }, 300);
 });
 
 const statusColors = {
@@ -43,6 +60,29 @@ const setStatus = (customer, status) => {
                         <p class="text-[12px] text-[#A9B8C6] tracking-[0.2em] uppercase mt-1.5 font-bold">Global Customer Account Controls</p>
                     </div>
                 </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="flex flex-wrap gap-3 mb-8">
+                <div class="relative flex-1 min-w-48">
+                    <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7E8E]"></i>
+                    <input v-model="filters.search" type="text" placeholder="Name, ID number, phone…"
+                           class="w-full bg-[#112236] border border-[#ffffff14] rounded-xl pl-9 pr-3 py-2.5 text-sm text-[#F0EBE1]
+                                  placeholder-[#6B7E8E] focus:outline-none focus:border-[#4CAF7D]/50 transition-colors" />
+                </div>
+                <select v-model="filters.kyc_status"
+                        class="bg-[#112236] border border-[#ffffff14] rounded-xl px-3 py-2.5 text-sm text-[#F0EBE1] focus:outline-none focus:border-[#4CAF7D]/50 transition-colors">
+                    <option value="">All KYC</option>
+                    <option value="pending">Pending</option>
+                    <option value="under_review">Under Review</option>
+                    <option value="verified">Verified</option>
+                    <option value="rejected">Rejected</option>
+                </select>
+                <select v-model="filters.branch_id"
+                        class="bg-[#112236] border border-[#ffffff14] rounded-xl px-3 py-2.5 text-sm text-[#F0EBE1] focus:outline-none focus:border-[#4CAF7D]/50 transition-colors">
+                    <option value="">All Branches</option>
+                    <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.branch_name }}</option>
+                </select>
             </div>
 
             <!-- Flash -->

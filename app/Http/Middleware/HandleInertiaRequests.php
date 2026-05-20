@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Models\PendingApproval;
 use App\Models\KycDocument;
@@ -32,8 +33,8 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
-        // Staff use the 'staff' guard; fall back to default web guard for any future user types
-        $user = $request->user('staff') ?? $request->user();
+        // Only load staff users here — never the Customer model
+        $user = $request->user('staff');
 
         // Load permissions once – reused for both auth.user.permissions and notification gating
         $permissions = [];
@@ -49,16 +50,28 @@ class HandleInertiaRequests extends Middleware
         $isSuperAdmin = $user && $user->role_id === 1;
         $can = fn(string $p) => $isSuperAdmin || in_array($p, $permissions);
 
+        // Customer portal guard — resolved separately, never mixed with staff $user
+        $customer = Auth::guard('customers')->user();
+
         return [
             ...parent::share($request),
             'auth' => [
                 'user' => $user ? array_merge($user->load('role')->toArray(), [
                     'permissions' => $permissions,
                 ]) : null,
+                'customer' => $customer ? [
+                    'id'                   => $customer->id,
+                    'full_name'            => $customer->full_name,
+                    'phone'                => $customer->phone,
+                    'email'                => $customer->email,
+                    'must_change_password' => $customer->must_change_password,
+                    'unread_count'         => $customer->unreadNotificationsCount(),
+                ] : null,
             ],
             'flash' => [
                 'success' => $request->session()->get('success'),
                 'error'   => $request->session()->get('error'),
+                'info'    => $request->session()->get('info'),
             ],
             // Wrapped in a closure so Inertia evaluates it lazily (once per response)
             'notifications' => fn() => $this->buildNotifications($user, $can),

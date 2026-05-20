@@ -4,7 +4,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { ref, computed } from 'vue';
 
 const props = defineProps({
-    branches: { type: Array, default: () => [] },
+    staff_branch: { type: Object, default: () => ({}) },
     accountTypes: { type: Array, default: () => [] },
     flash: { type: Object, default: () => ({}) }
 });
@@ -49,7 +49,6 @@ const form = useForm({
     // 5. Account
     account_type_id: '',
     home_branch_id: '',
-    initial_deposit: '',
     
     // 7. Next of Kin
     next_of_kin_name: '',
@@ -87,7 +86,7 @@ const selectAccount = (id) => {
       <div class="hdr flex flex-col md:flex-row justify-between items-start mb-10 gap-6">
         <div class="hdr-left">
           <div class="flex items-center gap-3 mb-4">
-            <img src="/storage/images/MAin Logo.png" alt="Gobaad Bank" class="h-9 w-auto object-contain shrink-0" />
+            <img src="/images/MAin Logo.png" alt="Gobaad Bank" class="h-9 w-auto object-contain shrink-0" />
             <span class="text-[11px] uppercase tracking-widest text-[#C9A84C] font-semibold">Gobaad Bank</span>
           </div>
           <h1 class="font-serif text-3xl text-[#F0EBE1] leading-tight">New Customer<br><em class="text-[#E5C97E] not-italic">Registration</em></h1>
@@ -340,17 +339,11 @@ const selectAccount = (id) => {
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="flex flex-col gap-1.5">
-                    <label class="text-[11.5px] text-[#A9B8C6] font-medium tracking-wide">Home Branch <span class="text-[#C9A84C]">*</span></label>
-                    <select v-model="form.home_branch_id" class="form-select" required>
-                        <option value="">Select Branch</option>
-                        <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.branch_name }}</option>
-                    </select>
-                </div>
-                <div class="flex flex-col gap-1.5">
-                    <label class="text-[11.5px] text-[#A9B8C6] font-medium tracking-wide">Initial Deposit ($)</label>
-                    <input type="number" step="0.01" v-model="form.initial_deposit" placeholder="0.00" class="form-input" />
+            <div class="flex flex-col gap-1.5">
+                <label class="text-[11.5px] text-[#A9B8C6] font-medium tracking-wide">Home Branch</label>
+                <div class="form-input flex items-center gap-2 text-[#C9A84C] font-medium cursor-not-allowed opacity-80">
+                    <i class="ti ti-building-bank text-sm"></i>
+                    {{ props.staff_branch?.branch_name ?? '—' }}
                 </div>
             </div>
         </section>

@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\PendingApproval;
+use App\Models\Staff;
 use App\Models\Transaction;
 use App\Services\LedgerService;
+use App\Services\NotificationService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Exception;
@@ -84,8 +86,8 @@ class ApprovalController extends Controller
             'note' => 'nullable|string|max:1000',
         ]);
 
-        $staff       = Auth::guard('staff')->user();
-        $transaction = Transaction::findOrFail($id);
+        $staff       = Auth::guard('staff')->user()->load('role');
+        $transaction = Transaction::with(['primaryAccount.customer'])->findOrFail($id);
 
         if ($transaction->status !== 'pending_approval') {
             return back()->withErrors(['error' => 'This transaction is no longer pending approval.']);
@@ -105,6 +107,61 @@ class ApprovalController extends Controller
                 'decision_note' => $request->note ?: null,
             ]);
 
+            $decidedAt = now()->format('d M Y, H:i:s');
+            $amount    = number_format($transaction->amount, 2);
+
+            // Notify the customer whose primary account was involved
+            $customer = $transaction->primaryAccount?->customer;
+            if ($customer) {
+                app(NotificationService::class)->send(
+                    recipientId:   $customer->id,
+                    recipientType: 'customer',
+                    message:       "Your transaction of \${$amount} (Ref: {$transaction->reference}) has been approved and processed.",
+                    subject:       'Transaction Approved',
+                    mailView:      'transaction-decision',
+                    mailData:      [
+                        'customerName'   => $customer->full_name,
+                        'decision'       => 'approved',
+                        'reference'      => $transaction->reference,
+                        'type'           => ucfirst($transaction->type),
+                        'amount'         => $transaction->amount,
+                        'accountNumber'  => $transaction->primaryAccount?->account_number ?? '—',
+                        'decidedAt'      => $decidedAt,
+                        'decisionNote'   => $request->note,
+                    ]
+                );
+            }
+
+            // Notify the teller who submitted the transaction
+            if ($transaction->initiated_by) {
+                $teller = Staff::find($transaction->initiated_by);
+                if ($teller) {
+                    $typeLabel = ucfirst($transaction->type);
+                    app(NotificationService::class)->send(
+                        recipientId:   $teller->id,
+                        recipientType: 'staff',
+                        message:       "Your {$typeLabel} of \${$amount} (Ref: {$transaction->reference}) has been approved by {$staff->full_name}.",
+                        subject:       "Transaction Approved — {$transaction->reference}",
+                        mailView:      'staff-notification',
+                        mailData:      [
+                            'headerTag'  => 'Transaction Approved',
+                            'greeting'   => "Hello {$teller->full_name},",
+                            'body'       => "Good news! Your submitted transaction has been approved and the funds have been posted to the ledger.",
+                            'details'    => [
+                                'Reference'   => $transaction->reference,
+                                'Type'        => $typeLabel,
+                                'Amount'      => "\${$amount}",
+                                'Decision'    => 'Approved ✓',
+                                'Approved by' => $staff->full_name . ' (' . ($staff->role?->role_name ?? 'Supervisor') . ')',
+                                'Approved at' => $decidedAt,
+                                'Note'        => $request->note ?: '—',
+                            ],
+                            'actionNote' => null,
+                        ]
+                    );
+                }
+            }
+
             return back()->with('success',
                 "✓ {$transaction->reference} approved — \${$transaction->amount} posted to ledger."
             );
@@ -119,8 +176,12 @@ class ApprovalController extends Controller
      * ───────────────────────────────────────────── */
     public function reject(Request $request, int $id)
     {
-        $staff       = Auth::guard('staff')->user();
-        $transaction = Transaction::findOrFail($id);
+        $staff       = Auth::guard('staff')->user()->load('role');
+        $transaction = Transaction::with(['primaryAccount.customer'])->findOrFail($id);
+
+        if ($transaction->status !== 'pending_approval') {
+            return back()->withErrors(['error' => 'This transaction is no longer pending approval.']);
+        }
 
         if ($transaction->branch_id !== $staff->branch_id) {
             return back()->withErrors(['error' => 'You can only reject transactions from your branch.']);
@@ -139,6 +200,61 @@ class ApprovalController extends Controller
             'decided_at'    => now(),
             'decision_note' => $reason,
         ]);
+
+        $decidedAt = now()->format('d M Y, H:i:s');
+        $amount    = number_format($transaction->amount, 2);
+
+        // Notify the customer
+        $customer = $transaction->primaryAccount?->customer;
+        if ($customer) {
+            app(NotificationService::class)->send(
+                recipientId:   $customer->id,
+                recipientType: 'customer',
+                message:       "Your transaction of \${$amount} (Ref: {$transaction->reference}) has been rejected. Reason: {$reason}",
+                subject:       'Transaction Rejected',
+                mailView:      'transaction-decision',
+                mailData:      [
+                    'customerName'   => $customer->full_name,
+                    'decision'       => 'rejected',
+                    'reference'      => $transaction->reference,
+                    'type'           => ucfirst($transaction->type),
+                    'amount'         => $transaction->amount,
+                    'accountNumber'  => $transaction->primaryAccount?->account_number ?? '—',
+                    'decidedAt'      => $decidedAt,
+                    'decisionNote'   => $reason,
+                ]
+            );
+        }
+
+        // Notify the teller who submitted the transaction
+        if ($transaction->initiated_by) {
+            $teller = Staff::find($transaction->initiated_by);
+            if ($teller) {
+                $typeLabel = ucfirst($transaction->type);
+                app(NotificationService::class)->send(
+                    recipientId:   $teller->id,
+                    recipientType: 'staff',
+                    message:       "Your {$typeLabel} of \${$amount} (Ref: {$transaction->reference}) was rejected. Reason: {$reason}",
+                    subject:       "Transaction Rejected — {$transaction->reference}",
+                    mailView:      'staff-notification',
+                    mailData:      [
+                        'headerTag'  => 'Transaction Rejected',
+                        'greeting'   => "Hello {$teller->full_name},",
+                        'body'       => "Your submitted transaction has been rejected by {$staff->full_name}. No funds have been moved.",
+                        'details'    => [
+                            'Reference'   => $transaction->reference,
+                            'Type'        => $typeLabel,
+                            'Amount'      => "\${$amount}",
+                            'Decision'    => 'Rejected ✗',
+                            'Rejected by' => $staff->full_name . ' (' . ($staff->role?->role_name ?? 'Supervisor') . ')',
+                            'Rejected at' => $decidedAt,
+                            'Reason'      => $reason,
+                        ],
+                        'actionNote' => 'Please review the rejection reason and contact your supervisor if you have questions.',
+                    ]
+                );
+            }
+        }
 
         return back()->with('success',
             "✗ {$transaction->reference} rejected — no funds were moved."

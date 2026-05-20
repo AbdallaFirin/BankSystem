@@ -1,7 +1,38 @@
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue';
-import { Link, usePage, router } from '@inertiajs/vue3';
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
+import { Link, usePage } from '@inertiajs/vue3';
 import { useAuthStore } from '@/stores/auth';
+import { useTheme } from '@/composables/useTheme';
+
+const { isDark, toggleTheme } = useTheme();
+
+// ── Notification dropdown ─────────────────────────────────────────────────────
+const showNotifDropdown  = ref(false)
+const notifBellDesktop   = ref(null)
+const notifBellMobile    = ref(null)
+
+function toggleNotifDropdown() {
+    showNotifDropdown.value = !showNotifDropdown.value
+}
+
+function closeNotifDropdown(e) {
+    const insideDesktop = notifBellDesktop.value?.contains(e.target)
+    const insideMobile  = notifBellMobile.value?.contains(e.target)
+    if (!insideDesktop && !insideMobile) {
+        showNotifDropdown.value = false
+    }
+}
+
+const notifColorMap = {
+    amber:   { bg: 'bg-amber-500/10',   text: 'text-amber-400'   },
+    red:     { bg: 'bg-red-500/10',     text: 'text-red-400'     },
+    emerald: { bg: 'bg-emerald-500/10', text: 'text-emerald-400' },
+    blue:    { bg: 'bg-blue-500/10',    text: 'text-blue-400'    },
+    purple:  { bg: 'bg-purple-500/10',  text: 'text-purple-400'  },
+    slate:   { bg: 'bg-slate-500/10',   text: 'text-slate-400'   },
+}
+function notifBg(color)   { return (notifColorMap[color] ?? notifColorMap.slate).bg }
+function notifText(color) { return (notifColorMap[color] ?? notifColorMap.slate).text }
 
 const showingMobileNav = ref(false);
 const authStore = useAuthStore();
@@ -24,10 +55,56 @@ const currentUser = computed(() => page.props.auth?.user ?? {});
 // Force password change flag
 const mustChangePassword = computed(() => !!page.props.auth?.user?.force_password_change);
 
-// Sync Pinia with Inertia on every visit/mount
+// Sync Pinia with Inertia on every visit/mount + start idle tracker
 onMounted(() => {
-    syncAuth();
-});
+    syncAuth()
+    IDLE_EVENTS.forEach(e => window.addEventListener(e, resetStaffIdle, { passive: true }))
+    resetStaffIdle()
+    document.addEventListener('click', closeNotifDropdown, true)
+})
+
+onBeforeUnmount(() => {
+    IDLE_EVENTS.forEach(e => window.removeEventListener(e, resetStaffIdle))
+    clearTimeout(staffIdleTimer)
+    clearInterval(staffCountdownTimer)
+    document.removeEventListener('click', closeNotifDropdown, true)
+})
+
+// ── Staff Session Timeout (8 min idle → warning, 10 min → logout) ───────────
+const csrf               = computed(() => document.querySelector('meta[name="csrf-token"]')?.content ?? '')
+const showStaffTimeout   = ref(false)
+const staffCountdown     = ref(120)
+let staffIdleTimer = null, staffCountdownTimer = null
+
+const staffCountdownDisplay = computed(() => {
+  const m = Math.floor(staffCountdown.value / 60)
+  const s = String(staffCountdown.value % 60).padStart(2, '0')
+  return m > 0 ? `${m}:${s}` : `${staffCountdown.value}s`
+})
+
+function resetStaffIdle() {
+  if (showStaffTimeout.value) return
+  clearTimeout(staffIdleTimer)
+  staffIdleTimer = setTimeout(() => {
+    showStaffTimeout.value = true
+    staffCountdown.value   = 120
+    staffCountdownTimer = setInterval(() => {
+      staffCountdown.value--
+      if (staffCountdown.value <= 0) {
+        clearInterval(staffCountdownTimer)
+        document.querySelector('form[action*="logout"]')?.submit()
+      }
+    }, 1000)
+  }, 8 * 60 * 1000)
+}
+
+function extendStaffSession() {
+  showStaffTimeout.value = false
+  clearInterval(staffCountdownTimer)
+  resetStaffIdle()
+}
+
+const IDLE_EVENTS = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll']
 
 const syncAuth = () => {
     const user = page.props.auth?.user;
@@ -41,34 +118,7 @@ const syncAuth = () => {
 };
 
 // ── Notifications ─────────────────────────────────────────────────────────────
-const showNotifications = ref(false);
 const notifications = computed(() => page.props.notifications ?? { count: 0, items: [] });
-
-function toggleNotifications() {
-    showNotifications.value = !showNotifications.value;
-}
-
-// Per-color Tailwind classes (full strings so Tailwind includes them in the build)
-const NOTIF_COLORS = {
-    amber:   { icon: 'bg-amber-500/15 text-amber-400',   dot: 'bg-amber-400' },
-    emerald: { icon: 'bg-emerald-500/15 text-emerald-400', dot: 'bg-emerald-400' },
-    red:     { icon: 'bg-red-500/15 text-red-400',       dot: 'bg-red-400' },
-    sky:     { icon: 'bg-sky-500/15 text-sky-400',       dot: 'bg-sky-400' },
-};
-function notifColor(color) {
-    return NOTIF_COLORS[color] ?? NOTIF_COLORS['amber'];
-}
-
-// Poll for new notifications every 30 s (partial reload — only updates notifications prop)
-let pollTimer = null;
-onMounted(() => {
-    pollTimer = setInterval(() => {
-        router.reload({ only: ['notifications'], preserveScroll: true, preserveState: true });
-    }, 30_000);
-});
-onUnmounted(() => {
-    if (pollTimer) clearInterval(pollTimer);
-});
 
 // ── Permission helper ──────────────────────────────────────────────────────────
 // Permission helper — reads directly from Inertia shared props (always available,
@@ -94,20 +144,68 @@ const can = (permission) => {
       <!-- Logo + Bank Name -->
       <div class="h-16 flex items-center px-5 border-b border-[#ffffff14] shrink-0 gap-3">
         <Link :href="route('staff.dashboard')" class="flex items-center gap-3 min-w-0 flex-1">
-            <img src="/storage/images/MAin Logo.png" alt="Gobaad Bank" class="h-9 w-auto object-contain shrink-0" />
+            <img src="/images/MAin Logo.png" alt="Gobaad Bank" class="h-9 w-auto object-contain shrink-0" />
             <span class="font-serif text-[#C9A84C] tracking-wide text-sm whitespace-nowrap overflow-hidden text-ellipsis">Gobaad Bank</span>
         </Link>
-        <!-- Bell (desktop sidebar) -->
-        <button @click="toggleNotifications"
-                class="relative shrink-0 text-[#A9B8C6] p-1.5 hover:bg-[rgba(255,255,255,0.06)] rounded-lg transition"
-                title="Notifications">
-          <i class="ti ti-bell text-base"></i>
-          <span v-if="notifications.count > 0"
-                class="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-0.5 bg-red-500 text-white
-                       text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
-            {{ notifications.count > 99 ? '99+' : notifications.count }}
-          </span>
+        <!-- Theme toggle (desktop sidebar) -->
+        <button @click="toggleTheme"
+                class="theme-toggle-btn shrink-0 text-[#A9B8C6] hover:text-[#C9A84C] p-1.5 rounded-lg hover:bg-[rgba(201,168,76,0.08)] transition"
+                :title="isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'">
+          <i :class="isDark ? 'ti ti-sun text-base' : 'ti ti-moon text-base'"></i>
         </button>
+
+        <!-- Bell (desktop sidebar) — dropdown -->
+        <div ref="notifBellDesktop" class="relative shrink-0">
+          <button @click.stop="toggleNotifDropdown"
+                  class="relative text-[#A9B8C6] hover:text-[#C9A84C] p-1.5 rounded-lg hover:bg-[rgba(201,168,76,0.08)] transition"
+                  title="Notifications">
+            <i class="ti ti-bell text-base"></i>
+            <span v-if="notifications.count > 0"
+                  class="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-0.5 bg-red-500 text-white
+                         text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
+              {{ notifications.count > 99 ? '99+' : notifications.count }}
+            </span>
+          </button>
+
+          <!-- Dropdown panel -->
+          <Transition name="notif-drop">
+            <div v-if="showNotifDropdown"
+                 class="absolute top-full right-0 mt-2 w-80 bg-[#112236] border border-[#ffffff14]
+                        rounded-2xl shadow-2xl z-[200] overflow-hidden">
+              <!-- Header -->
+              <div class="flex items-center justify-between px-4 py-3 border-b border-[#ffffff0a]">
+                <span class="text-xs font-bold uppercase tracking-widest text-[#A9B8C6]">Notifications</span>
+                <span v-if="notifications.count > 0"
+                      class="text-[10px] bg-red-500/20 text-red-400 border border-red-500/20 px-2 py-0.5 rounded-full font-bold">
+                  {{ notifications.count }} new
+                </span>
+              </div>
+
+              <!-- Items -->
+              <div class="max-h-80 overflow-y-auto divide-y divide-[#ffffff08]">
+                <template v-if="notifications.items?.length">
+                  <Link v-for="n in notifications.items" :key="n.id"
+                        :href="n.link ?? '#'"
+                        @click="showNotifDropdown = false"
+                        class="flex items-start gap-3 px-4 py-3 hover:bg-[rgba(255,255,255,0.03)] transition cursor-pointer block">
+                    <div :class="[notifBg(n.color), 'w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5']">
+                      <i :class="['ti', n.icon ?? 'ti-bell', 'text-sm', notifText(n.color)]"></i>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <p class="text-xs font-semibold text-[#F0EBE1] leading-tight">{{ n.title }}</p>
+                      <p class="text-[11px] text-[#A9B8C6] mt-0.5 leading-snug line-clamp-2">{{ n.body }}</p>
+                      <p class="text-[10px] text-[#6B7E8E] mt-1">{{ n.time }}</p>
+                    </div>
+                  </Link>
+                </template>
+                <div v-else class="px-4 py-8 text-center text-[#6B7E8E]">
+                  <i class="ti ti-bell-off text-2xl block mb-2"></i>
+                  <p class="text-xs">No new notifications</p>
+                </div>
+              </div>
+            </div>
+          </Transition>
+        </div>
       </div>
 
       <!-- Current User Info -->
@@ -179,6 +277,15 @@ const can = (permission) => {
             <span class="text-sm font-medium">My Till</span>
           </Link>
 
+          <!-- Transaction History -->
+          <Link v-if="can('transaction.deposit') || can('transaction.withdraw') || can('transaction.transfer')"
+                :href="route('staff.teller.history')"
+                class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition"
+                :class="route().current('staff.teller.history') ? 'bg-[rgba(99,179,237,0.1)] text-[#63B3ED]' : 'text-[#A9B8C6] hover:text-[#63B3ED] hover:bg-[rgba(99,179,237,0.05)]'">
+            <i class="ti ti-history text-lg"></i>
+            <span class="text-sm font-medium">Transaction History</span>
+          </Link>
+
           <!-- Cash Allocation (supervisor / vault cashier only) -->
           <Link v-if="can('approvals.read')"
                 :href="route('staff.teller.cash-allocation.index')"
@@ -238,6 +345,13 @@ const can = (permission) => {
         <template v-if="can('branch.settings')">
           <div class="text-[10px] uppercase tracking-widest text-[#A9B8C6] opacity-50 mt-6 mb-3 px-2 font-semibold">Branch Management</div>
 
+          <Link :href="route('staff.branch.dashboard')"
+                class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition"
+                :class="route().current('staff.branch.dashboard') ? 'bg-[rgba(201,168,76,0.12)] text-[#C9A84C]' : 'text-[#A9B8C6] hover:text-[#C9A84C] hover:bg-[rgba(201,168,76,0.05)]'">
+            <i class="ti ti-layout-dashboard text-lg"></i>
+            <span class="text-sm font-medium">Branch Dashboard</span>
+          </Link>
+
           <Link :href="route('staff.branch.settings')"
                 class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition"
                 :class="route().current('staff.branch.settings') ? 'bg-[rgba(201,168,76,0.12)] text-[#C9A84C]' : 'text-[#A9B8C6] hover:text-[#C9A84C] hover:bg-[rgba(201,168,76,0.05)]'">
@@ -258,6 +372,20 @@ const can = (permission) => {
             <i class="ti ti-history text-lg"></i>
             <span class="text-sm font-medium">Branch Audit Trail</span>
           </Link>
+
+          <Link :href="route('staff.branch.clearing.index')"
+                class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition"
+                :class="route().current('staff.branch.clearing.*') ? 'bg-[rgba(56,189,248,0.12)] text-[#38BDF8]' : 'text-[#A9B8C6] hover:text-[#38BDF8] hover:bg-[rgba(56,189,248,0.05)]'">
+            <i class="ti ti-arrows-exchange text-lg"></i>
+            <span class="text-sm font-medium">Inter-Branch Clearing</span>
+          </Link>
+
+          <Link :href="route('staff.branch.reports')"
+                class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition"
+                :class="route().current('staff.branch.reports') ? 'bg-[rgba(52,211,153,0.12)] text-[#34D399]' : 'text-[#A9B8C6] hover:text-[#34D399] hover:bg-[rgba(52,211,153,0.05)]'">
+            <i class="ti ti-chart-bar text-lg"></i>
+            <span class="text-sm font-medium">Branch Reports</span>
+          </Link>
         </template>
 
         <!-- ── Operations ── -->
@@ -269,10 +397,29 @@ const can = (permission) => {
           <span class="text-sm font-medium">Supervisor Queue</span>
         </Link>
 
-        <Link v-if="can('compliance.check')" :href="route('staff.compliance.index')" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition" :class="route().current('staff.compliance.index') ? 'bg-[rgba(255,255,255,0.06)] text-[#F0EBE1]' : 'text-[#A9B8C6] hover:text-[#C9A84C] hover:bg-[rgba(255,255,255,0.02)]'">
-          <i class="ti ti-shield-check text-lg"></i>
-          <span class="text-sm font-medium">Compliance & AML</span>
-        </Link>
+        <!-- Compliance sub-section -->
+        <template v-if="can('compliance.check')">
+          <Link :href="route('staff.compliance.dashboard')" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition" :class="route().current('staff.compliance.dashboard') ? 'bg-[rgba(226,99,90,0.1)] text-[#E2635A]' : 'text-[#A9B8C6] hover:text-[#E2635A] hover:bg-[rgba(226,99,90,0.04)]'">
+            <i class="ti ti-shield-check text-lg"></i>
+            <span class="text-sm font-medium">Compliance Hub</span>
+          </Link>
+          <Link :href="route('staff.compliance.index')" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition pl-8" :class="route().current('staff.compliance.index') ? 'bg-[rgba(226,99,90,0.08)] text-[#E2635A]' : 'text-[#A9B8C6] hover:text-[#E2635A] hover:bg-[rgba(226,99,90,0.04)]'">
+            <i class="ti ti-file-search text-base"></i>
+            <span class="text-sm">KYC Queue</span>
+          </Link>
+          <Link :href="route('staff.compliance.customers')" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition pl-8" :class="route().current('staff.compliance.customers') || route().current('staff.compliance.customer-detail') ? 'bg-[rgba(226,99,90,0.08)] text-[#E2635A]' : 'text-[#A9B8C6] hover:text-[#E2635A] hover:bg-[rgba(226,99,90,0.04)]'">
+            <i class="ti ti-users text-base"></i>
+            <span class="text-sm">Customer Review</span>
+          </Link>
+          <Link v-if="can('aml.flag')" :href="route('staff.compliance.transactions')" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition pl-8" :class="route().current('staff.compliance.transactions') ? 'bg-[rgba(226,99,90,0.08)] text-[#E2635A]' : 'text-[#A9B8C6] hover:text-[#E2635A] hover:bg-[rgba(226,99,90,0.04)]'">
+            <i class="ti ti-activity text-base"></i>
+            <span class="text-sm">Transaction Monitor</span>
+          </Link>
+          <Link v-if="can('compliance.report')" :href="route('staff.compliance.reports')" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition pl-8" :class="route().current('staff.compliance.reports') ? 'bg-[rgba(226,99,90,0.08)] text-[#E2635A]' : 'text-[#A9B8C6] hover:text-[#E2635A] hover:bg-[rgba(226,99,90,0.04)]'">
+            <i class="ti ti-report-analytics text-base"></i>
+            <span class="text-sm">SAR Reports</span>
+          </Link>
+        </template>
 
         <Link v-if="can('reconciliation.read')" :href="route('staff.accounting.ledger')" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition" :class="route().current('staff.accounting.ledger') ? 'bg-[rgba(255,255,255,0.06)] text-[#F0EBE1]' : 'text-[#A9B8C6] hover:text-[#C9A84C] hover:bg-[rgba(255,255,255,0.02)]'">
           <i class="ti ti-report-money text-lg"></i>
@@ -305,6 +452,10 @@ const can = (permission) => {
           <Link :href="route('staff.admin.customers.index')" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition" :class="route().current('staff.admin.customers.index') ? 'bg-[rgba(255,255,255,0.06)] text-[#F0EBE1]' : 'text-[#A9B8C6] hover:text-[#C9A84C] hover:bg-[rgba(255,255,255,0.02)]'">
             <i class="ti ti-users text-lg"></i>
             <span class="text-sm font-medium">Customer Controls</span>
+          </Link>
+          <Link :href="route('staff.admin.portal-access.index')" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition" :class="route().current('staff.admin.portal-access.index') ? 'bg-[rgba(255,255,255,0.06)] text-[#F0EBE1]' : 'text-[#A9B8C6] hover:text-[#C9A84C] hover:bg-[rgba(255,255,255,0.02)]'">
+            <i class="ti ti-key text-lg"></i>
+            <span class="text-sm font-medium">Portal Access</span>
           </Link>
           <Link :href="route('staff.admin.settings.index')" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition" :class="route().current('staff.admin.settings.index') ? 'bg-[rgba(255,255,255,0.06)] text-[#F0EBE1]' : 'text-[#A9B8C6] hover:text-[#C9A84C] hover:bg-[rgba(255,255,255,0.02)]'">
             <i class="ti ti-settings-2 text-lg"></i>
@@ -362,21 +513,63 @@ const can = (permission) => {
       <!-- Mobile Header -->
       <div class="md:hidden h-16 flex items-center justify-between px-4 bg-[#112236] border-b border-[#ffffff14] shrink-0">
          <div class="flex items-center gap-3">
-            <img src="/storage/images/MAin Logo.png" alt="Gobaad Bank" class="h-8 w-auto object-contain shrink-0" />
+            <img src="/images/MAin Logo.png" alt="Gobaad Bank" class="h-8 w-auto object-contain shrink-0" />
             <span class="font-serif text-[#C9A84C] tracking-wide text-sm whitespace-nowrap">Gobaad Bank</span>
          </div>
          <div class="flex items-center gap-1">
-           <!-- Bell (mobile) -->
-           <button @click="toggleNotifications"
-                   class="relative text-[#A9B8C6] p-2 hover:bg-[rgba(255,255,255,0.05)] rounded-lg transition"
-                   title="Notifications">
-             <i class="ti ti-bell text-xl"></i>
-             <span v-if="notifications.count > 0"
-                   class="absolute top-1 right-1 min-w-[16px] h-4 px-0.5 bg-red-500 text-white
-                          text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
-               {{ notifications.count > 99 ? '99+' : notifications.count }}
-             </span>
+           <!-- Theme toggle (mobile) -->
+           <button @click="toggleTheme"
+                   class="theme-toggle-btn text-[#A9B8C6] hover:text-[#C9A84C] p-2 rounded-lg transition">
+             <i :class="isDark ? 'ti ti-sun text-xl' : 'ti ti-moon text-xl'"></i>
            </button>
+           <!-- Bell (mobile) — shared dropdown -->
+           <div ref="notifBellMobile" class="relative">
+             <button @click.stop="toggleNotifDropdown"
+                     class="relative text-[#A9B8C6] hover:text-[#C9A84C] p-2 rounded-lg transition"
+                     title="Notifications">
+               <i class="ti ti-bell text-xl"></i>
+               <span v-if="notifications.count > 0"
+                     class="absolute top-1 right-1 min-w-[16px] h-4 px-0.5 bg-red-500 text-white
+                            text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
+                 {{ notifications.count > 99 ? '99+' : notifications.count }}
+               </span>
+             </button>
+             <!-- Mobile dropdown -->
+             <Transition name="notif-drop">
+               <div v-if="showNotifDropdown"
+                    class="absolute top-full right-0 mt-2 w-72 bg-[#112236] border border-[#ffffff14]
+                           rounded-2xl shadow-2xl z-[200] overflow-hidden">
+                 <div class="flex items-center justify-between px-4 py-3 border-b border-[#ffffff0a]">
+                   <span class="text-xs font-bold uppercase tracking-widest text-[#A9B8C6]">Notifications</span>
+                   <span v-if="notifications.count > 0"
+                         class="text-[10px] bg-red-500/20 text-red-400 border border-red-500/20 px-2 py-0.5 rounded-full font-bold">
+                     {{ notifications.count }} new
+                   </span>
+                 </div>
+                 <div class="max-h-72 overflow-y-auto divide-y divide-[#ffffff08]">
+                   <template v-if="notifications.items?.length">
+                     <Link v-for="n in notifications.items" :key="n.id"
+                           :href="n.link ?? '#'"
+                           @click="showNotifDropdown = false"
+                           class="flex items-start gap-3 px-4 py-3 hover:bg-[rgba(255,255,255,0.03)] transition block">
+                       <div :class="[notifBg(n.color), 'w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5']">
+                         <i :class="['ti', n.icon ?? 'ti-bell', 'text-sm', notifText(n.color)]"></i>
+                       </div>
+                       <div class="min-w-0 flex-1">
+                         <p class="text-xs font-semibold text-[#F0EBE1] leading-tight">{{ n.title }}</p>
+                         <p class="text-[11px] text-[#A9B8C6] mt-0.5 leading-snug line-clamp-2">{{ n.body }}</p>
+                         <p class="text-[10px] text-[#6B7E8E] mt-1">{{ n.time }}</p>
+                       </div>
+                     </Link>
+                   </template>
+                   <div v-else class="px-4 py-8 text-center text-[#6B7E8E]">
+                     <i class="ti ti-bell-off text-2xl block mb-2"></i>
+                     <p class="text-xs">No new notifications</p>
+                   </div>
+                 </div>
+               </div>
+             </Transition>
+           </div>
            <!-- Hamburger -->
            <button @click="showingMobileNav = !showingMobileNav" class="text-[#A9B8C6] p-2 hover:bg-[rgba(255,255,255,0.05)] rounded">
              <i class="ti ti-menu-2 text-xl" v-if="!showingMobileNav"></i>
@@ -410,6 +603,9 @@ const can = (permission) => {
               </Link>
               <Link v-if="authStore.can('transaction.deposit') || authStore.can('transaction.withdraw')" :href="route('staff.teller.my-till')" class="block text-[#A9B8C6] py-2 px-3 rounded hover:text-[#FBBF24]" :class="{'text-[#FBBF24] bg-[rgba(251,191,36,0.08)]': route().current('staff.teller.my-till')}">
                 <i class="ti ti-cash-register mr-2"></i>My Till
+              </Link>
+              <Link :href="route('staff.teller.history')" class="block text-[#A9B8C6] py-2 px-3 rounded hover:text-[#63B3ED]" :class="{'text-[#63B3ED] bg-[rgba(99,179,237,0.08)]': route().current('staff.teller.history')}">
+                <i class="ti ti-history mr-2"></i>Transaction History
               </Link>
               <Link v-if="authStore.can('approvals.read')" :href="route('staff.teller.cash-allocation.index')" class="block text-[#A9B8C6] py-2 px-3 rounded hover:text-[#6366F1]" :class="{'text-[#6366F1] bg-[rgba(99,102,241,0.08)]': route().current('staff.teller.cash-allocation.*')}">
                 <i class="ti ti-wallet mr-2"></i>Cash Allocation
@@ -502,80 +698,35 @@ const can = (permission) => {
           <slot />
       </main>
     </div>
-    
+
   </div>
 
-  <!-- ── Notifications dropdown (portal — appears above everything) ── -->
-  <Teleport to="body">
-    <!-- Backdrop: clicking outside closes the panel -->
-    <div v-if="showNotifications"
-         class="fixed inset-0 z-[9990]"
-         @click="showNotifications = false">
-    </div>
-
-    <Transition name="notif-drop">
-      <div v-if="showNotifications"
-           class="fixed z-[9995] flex flex-col rounded-xl shadow-2xl overflow-hidden
-                  bg-[#112236] border border-[#ffffff14]
-                  top-[64px] right-2 w-80 max-h-[calc(100vh-80px)]
-                  md:top-[64px] md:left-2 md:right-auto md:w-[288px]">
-
-        <!-- Panel header -->
-        <div class="flex items-center justify-between px-4 py-3 border-b border-[#ffffff10] shrink-0">
-          <div class="flex items-center gap-2">
-            <i class="ti ti-bell text-[#C9A84C] text-base"></i>
-            <span class="text-sm font-semibold text-[#F0EBE1]">Notifications</span>
-          </div>
-          <span v-if="notifications.count > 0"
-                class="text-[10px] font-bold px-2 py-0.5 bg-red-500/20 text-red-400
-                       rounded-full border border-red-500/30">
-            {{ notifications.count }}
-          </span>
+  <!-- ── Staff Session Timeout Modal ── -->
+  <Transition name="fade-btn">
+    <div v-if="showStaffTimeout" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+      <div class="bg-[#112236] border border-[#ffffff14] rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
+        <div class="w-14 h-14 rounded-full bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
+          <i class="ti ti-clock-exclamation text-amber-400 text-2xl"></i>
         </div>
-
-        <!-- Items list -->
-        <div class="overflow-y-auto flex-1">
-          <!-- Empty state -->
-          <div v-if="notifications.items.length === 0"
-               class="flex flex-col items-center justify-center py-10 px-4 text-center">
-            <div class="w-12 h-12 rounded-full bg-[#ffffff08] flex items-center justify-center mb-3">
-              <i class="ti ti-bell-off text-[#A9B8C6] text-xl"></i>
-            </div>
-            <p class="text-sm text-[#A9B8C6]">All clear — no new notifications</p>
-          </div>
-
-          <!-- Notification items -->
-          <template v-else>
-            <Link v-for="item in notifications.items"
-                  :key="item.id"
-                  :href="item.link"
-                  @click="showNotifications = false"
-                  class="flex items-start gap-3 px-4 py-3
-                         hover:bg-[rgba(255,255,255,0.04)] transition
-                         border-b border-[#ffffff08] last:border-0">
-              <!-- Coloured icon -->
-              <div class="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center mt-0.5"
-                   :class="notifColor(item.color).icon">
-                <i :class="['ti', item.icon, 'text-sm']"></i>
-              </div>
-
-              <!-- Text -->
-              <div class="flex-1 min-w-0">
-                <p class="text-xs font-semibold text-[#F0EBE1] leading-tight">{{ item.title }}</p>
-                <p class="text-[11px] text-[#A9B8C6] mt-0.5 leading-snug line-clamp-2">{{ item.body }}</p>
-                <p class="text-[10px] text-[#6B7E8E] mt-1">{{ item.time }}</p>
-              </div>
-
-              <!-- Accent dot -->
-              <div class="shrink-0 w-2 h-2 rounded-full mt-2"
-                   :class="notifColor(item.color).dot">
-              </div>
-            </Link>
-          </template>
+        <h3 class="text-lg font-bold text-[#F0EBE1] mb-2">Session Expiring</h3>
+        <p class="text-sm text-[#A9B8C6] mb-1">Your session will expire in</p>
+        <p class="text-3xl font-bold text-red-400 mb-5">{{ staffCountdownDisplay }}</p>
+        <div class="flex gap-3">
+          <button @click="extendStaffSession"
+            class="flex-1 bg-[#C9A84C] hover:bg-[#b8973d] text-[#0B1929] font-bold py-2.5 rounded-xl text-sm transition-colors">
+            Stay Logged In
+          </button>
+          <form :action="route('logout')" method="POST" class="flex-1">
+            <input type="hidden" name="_token" :value="csrf" />
+            <button type="submit" class="w-full border border-[#ffffff14] text-[#A9B8C6] hover:text-[#F0EBE1] hover:bg-[rgba(255,255,255,0.05)] font-semibold py-2.5 rounded-xl text-sm transition-colors">
+              Log Out
+            </button>
+          </form>
         </div>
       </div>
-    </Transition>
-  </Teleport>
+    </div>
+  </Transition>
+
 </template>
 
 <style>
@@ -585,8 +736,8 @@ const can = (permission) => {
 .fade-btn-enter-active, .fade-btn-leave-active { transition: opacity .2s, transform .2s; }
 .fade-btn-enter-from, .fade-btn-leave-to { opacity: 0; transform: translateX(-6px); }
 
-.notif-drop-enter-active, .notif-drop-leave-active { transition: opacity .18s ease, transform .18s ease; }
-.notif-drop-enter-from, .notif-drop-leave-to { opacity: 0; transform: translateY(-8px) scale(.97); }
+.notif-drop-enter-active, .notif-drop-leave-active { transition: opacity .15s, transform .15s; }
+.notif-drop-enter-from, .notif-drop-leave-to { opacity: 0; transform: translateY(-6px) scale(0.97); }
 
 /* Custom scrollbar for webkit */
 ::-webkit-scrollbar {

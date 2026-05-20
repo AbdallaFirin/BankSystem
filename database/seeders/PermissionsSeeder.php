@@ -33,6 +33,9 @@ class PermissionsSeeder extends Seeder
             ['permission_key' => 'approvals.read',      'module' => 'Operations', 'description' => 'View approval queue'],
             ['permission_key' => 'approvals.write',     'module' => 'Operations', 'description' => 'Approve/Reject transactions'],
             ['permission_key' => 'compliance.check',    'module' => 'Compliance', 'description' => 'Perform AML/KYC checks'],
+            ['permission_key' => 'aml.flag',            'module' => 'Compliance', 'description' => 'Flag transactions as suspicious'],
+            ['permission_key' => 'compliance.report',   'module' => 'Compliance', 'description' => 'File and manage Suspicious Activity Reports'],
+            ['permission_key' => 'audit.read',          'module' => 'Compliance', 'description' => 'View compliance audit trail'],
             ['permission_key' => 'reconciliation.read', 'module' => 'Accounting', 'description' => 'View GL and reconciliations'],
 
             // Branch Management
@@ -89,7 +92,7 @@ class PermissionsSeeder extends Seeder
                         // Operations
                         'approvals.read', 'approvals.write',
                         // Compliance
-                        'compliance.check',
+                        'compliance.check', 'aml.flag', 'compliance.report', 'audit.read',
                         // Accounting
                         'reconciliation.read',
                         // Branch config
@@ -98,11 +101,23 @@ class PermissionsSeeder extends Seeder
                     break;
 
                 case 'Compliance Officer':
-                    $keys = ['customer.read', 'kyc.verify', 'compliance.check'];
+                    $keys = [
+                        'customer.read',
+                        'kyc.verify', 'compliance.check',
+                        'aml.flag', 'compliance.report',
+                        'audit.read',
+                        'account.read',
+                    ];
                     break;
 
                 case 'Accounting Officer':
-                    $keys = ['reconciliation.read', 'ledger.read', 'account.read'];
+                    $keys = [
+                        'account.read',
+                        'ledger.read',
+                        'reconciliation.read',
+                        'audit.read',
+                        'customer.read',
+                    ];
                     break;
 
                 case 'Teller Supervisor':
@@ -114,6 +129,39 @@ class PermissionsSeeder extends Seeder
                         'vault.manage',
                         'ledger.read',
                     ];
+                    break;
+
+                case 'Loan Officer':
+                    $keys = [
+                        'customer.read',
+                        'account.read',
+                    ];
+                    break;
+
+                case 'Operational Manager':
+                    $keys = [
+                        'customer.read',
+                        'account.read', 'account.write',
+                        'ledger.read',
+                        'reconciliation.read',
+                        'audit.read',
+                        'compliance.report',
+                    ];
+                    break;
+
+                case 'Internal Auditor':
+                    $keys = [
+                        'customer.read',
+                        'account.read',
+                        'ledger.read', 'reconciliation.read',
+                        'audit.read',
+                        'compliance.report',
+                        'loan.read',
+                    ];
+                    break;
+
+                case 'System Admin':
+                    $keys = ['system.admin', 'audit.read', 'reconciliation.read'];
                     break;
 
                 case 'Super Admin':

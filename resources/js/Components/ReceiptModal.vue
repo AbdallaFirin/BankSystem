@@ -26,6 +26,7 @@ const TYPE_CFG = {
         hdrBorder:'border-emerald-700/25',
         iconCls:  'ti-arrow-down-circle text-emerald-300',
         btnCls:   'bg-emerald-600 hover:bg-emerald-500',
+        accentHex:'#2e7d52',
     },
     withdrawal: {
         label:    'Cash Withdrawal',
@@ -37,6 +38,7 @@ const TYPE_CFG = {
         hdrBorder:'border-amber-700/25',
         iconCls:  'ti-arrow-up-circle text-amber-300',
         btnCls:   'bg-amber-600 hover:bg-amber-500',
+        accentHex:'#b8860b',
     },
     transfer:   {
         label:    'Inter-Account Transfer',
@@ -48,6 +50,7 @@ const TYPE_CFG = {
         hdrBorder:'border-indigo-700/25',
         iconCls:  'ti-arrows-right-left text-indigo-300',
         btnCls:   'bg-indigo-600 hover:bg-indigo-500',
+        accentHex:'#5b4fcf',
     },
 }
 const cfg = computed(() => TYPE_CFG[props.type] ?? TYPE_CFG.deposit)
@@ -56,7 +59,7 @@ const cfg = computed(() => TYPE_CFG[props.type] ?? TYPE_CFG.deposit)
 const slipRows = computed(() => {
     if (!props.receipt || props.type === 'transfer') return []
     const r = props.receipt
-    return [
+    const rows = [
         ['Reference',    r.reference,      true ],
         ['Customer',     r.customer_name,  false],
         ['Account',      r.account_number, true ],
@@ -64,11 +67,43 @@ const slipRows = computed(() => {
         ['Teller',       r.teller,         false],
         ['Balance After','$' + fmt(r.balance_after), true],
     ]
+    if (r.remarks) rows.push(['Remarks', r.remarks, false])
+    return rows
 })
 
-/* ─── print helpers ─── */
+/* ─── shared popup CSS ─── */
+const sharedCss = color => `
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Georgia',serif;background:#fff;color:#222;width:340px;margin:0 auto;padding:0}
+.hdr{background:#0B1929;color:#fff;text-align:center;padding:18px 16px 14px}
+.hdr img{height:42px;margin:0 auto 7px;display:block}
+.hdr h1{font-size:16px;letter-spacing:.04em;font-weight:700}
+.hdr sub{font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:#7a9ab5;display:block;margin-top:3px}
+.body{padding:14px 14px 6px}
+.row{display:flex;justify-content:space-between;align-items:flex-start;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:12px;gap:8px}
+.row:last-child{border-bottom:none}
+.lbl{color:#888;font-size:11px;flex-shrink:0;white-space:nowrap}
+.val{font-weight:600;text-align:right;word-break:break-word}
+.mono{font-family:monospace;font-size:11px}
+.remarks-val{font-size:10.5px;font-weight:normal;font-style:italic;color:#555;text-align:right}
+.divider{border-top:2px dashed #e0e0e0;margin:8px 0}
+.big{font-size:20px;font-weight:700;color:${color}}
+.amt-row{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0 4px}
+.amt-lbl{font-size:13px;font-weight:600;color:#444}
+.sig-section{margin:10px 0 0;padding-top:12px;border-top:1px dashed #d0d0d0}
+.sig-title{font-size:8.5px;color:#aaa;text-transform:uppercase;letter-spacing:.1em;text-align:center;margin-bottom:14px}
+.sig-block{margin-bottom:20px}
+.sig-line{height:32px;border-bottom:1.5px solid #777;margin-bottom:5px}
+.sig-label{font-size:9px;color:#888;letter-spacing:.03em}
+.sig-label strong{color:#555;font-weight:600}
+.ftr{background:#0B1929;text-align:center;padding:9px 14px}
+.ftr p{color:#4a6070;font-size:9px;text-transform:uppercase;letter-spacing:.09em}
+.ftr p+p{margin-top:2px;color:#3a5060}
+@media print{body{width:100%}}`
+
+/* ─── popup window helper ─── */
 function openWin(html) {
-    const w = window.open('', '_blank', 'width=420,height=660,scrollbars=no,menubar=no,toolbar=no')
+    const w = window.open('', '_blank', 'width=420,height=720,scrollbars=no,menubar=no,toolbar=no')
     if (!w) return
     w.document.write(html)
     w.document.close()
@@ -76,54 +111,71 @@ function openWin(html) {
     setTimeout(() => w.print(), 400)
 }
 
-const sharedCss = color => `
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Georgia',serif;background:#fff;color:#222;width:320px;margin:0 auto;padding:20px 0}
-.hdr{background:#0B1929;color:#fff;text-align:center;padding:18px 16px 12px}
-.hdr img{height:40px;margin:0 auto 7px;display:block}
-.hdr h1{font-size:16px;letter-spacing:.04em;font-weight:700}
-.hdr sub{font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:#7a9ab5;display:block;margin-top:3px}
-.body{padding:14px}
-.row{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:1px solid #f0f0f0;font-size:12px}
-.row:last-child{border-bottom:none}
-.lbl{color:#888;font-size:11px;flex-shrink:0;margin-right:8px}
-.val{font-weight:600;text-align:right;word-break:break-all}
-.mono{font-family:monospace;font-size:11px}
-.divider{border-top:2px solid #eee;margin:6px 0}
-.big{font-size:20px;font-weight:700;color:${color}}
-.ftr{background:#0B1929;text-align:center;padding:9px 14px}
-.ftr p{color:#4a6070;font-size:9px;text-transform:uppercase;letter-spacing:.09em}
-.ftr p+p{margin-top:2px;color:#3a5060}
-@media print{body{width:100%}}`
-
+/* ─── Standard (deposit / withdrawal) popup HTML ─── */
 function buildStdHtml(r) {
-    const c = cfg.value
+    const c   = cfg.value
     const rows = [
-        ['Reference',     r.reference,      true ],
-        ['Customer',      r.customer_name,  false],
-        ['Account',       r.account_number, true ],
-        ['Date &amp; Time', r.processed_at, false],
-        ['Teller',        r.teller,         false],
-        ['Balance After', '$'+fmt(r.balance_after), true],
+        ['Reference',       r.reference,      true ],
+        ['Customer',        r.customer_name,  false],
+        ['Account',         r.account_number, true ],
+        ['Date &amp; Time', r.processed_at,   false],
+        ['Teller',          r.teller,         false],
+        ['Balance After',   '$' + fmt(r.balance_after), true],
     ]
+
+    const remarkHtml = r.remarks
+        ? `<div class="row"><span class="lbl">Remarks</span><span class="val remarks-val">${r.remarks}</span></div>`
+        : ''
+
+    const sigHtml = `
+<div class="sig-section">
+  <p class="sig-title">Authorized Signatures</p>
+  <div class="sig-block">
+    <div class="sig-line"></div>
+    <p class="sig-label"><strong>Teller:</strong> ${r.teller ?? '—'}</p>
+  </div>
+  <div class="sig-block">
+    <div class="sig-line"></div>
+    <p class="sig-label"><strong>Customer:</strong> ${r.customer_name ?? '—'}</p>
+  </div>
+</div>`
+
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${c.slipTitle}</title>
 <style>${sharedCss(c.amtColor)}</style></head><body>
 <div class="hdr">
-  <img src="/storage/images/MAin Logo.png" alt="" onerror="this.style.display='none'">
+  <img src="/images/MAin Logo.png" alt="" onerror="this.style.display='none'">
   <h1>Gobaad Bank</h1><sub>${c.slipTitle}</sub>
 </div>
 <div class="body">
-${rows.map(([l,v,m]) => `<div class="row"><span class="lbl">${l}</span><span class="val${m?' mono':''}">` +
-    `${v ?? '—'}</span></div>`).join('')}
+${rows.map(([l,v,m]) => `<div class="row"><span class="lbl">${l}</span><span class="val${m?' mono':''}">${v ?? '—'}</span></div>`).join('')}
+${remarkHtml}
 <div class="divider"></div>
-<div class="row"><span class="lbl" style="font-size:13px;font-weight:600">${c.amtLabel}</span>` +
-    `<span class="big">${c.sign}$${fmt(r.amount)}</span></div>
+<div class="amt-row"><span class="amt-lbl">${c.amtLabel}</span><span class="big">${c.sign}$${fmt(r.amount)}</span></div>
+${sigHtml}
 </div>
 <div class="ftr"><p>Gobaad Bank — Official Receipt</p><p>Keep this receipt for your records.</p></div>
 </body></html>`
 }
 
+/* ─── Transfer popup HTML ─── */
 function buildTransferHtml(r) {
+    const remarkHtml = r.remarks
+        ? `<div class="row"><span class="lbl">Remarks</span><span class="val remarks-val">${r.remarks}</span></div>`
+        : ''
+
+    const sigHtml = `
+<div class="sig-section">
+  <p class="sig-title">Authorized Signatures</p>
+  <div class="sig-block">
+    <div class="sig-line"></div>
+    <p class="sig-label"><strong>Teller:</strong> ${r.teller ?? '—'}</p>
+  </div>
+  <div class="sig-block">
+    <div class="sig-line"></div>
+    <p class="sig-label"><strong>Customer:</strong> ${r.from_customer ?? '—'}</p>
+  </div>
+</div>`
+
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Transfer Receipt</title>
 <style>${sharedCss('#5b4fcf')}
 .route{display:flex;border:1px solid #eee;border-radius:6px;overflow:hidden;margin:8px 0}
@@ -133,13 +185,14 @@ function buildTransferHtml(r) {
 .arr{width:26px;display:flex;align-items:center;justify-content:center;background:#ece7f6;color:#5b4fcf;font-size:14px;font-weight:700}
 </style></head><body>
 <div class="hdr">
-  <img src="/storage/images/MAin Logo.png" alt="" onerror="this.style.display='none'">
+  <img src="/images/MAin Logo.png" alt="" onerror="this.style.display='none'">
   <h1>Gobaad Bank</h1><sub>Inter-Account Transfer Receipt</sub>
 </div>
 <div class="body">
 <div class="row"><span class="lbl">Reference</span><span class="val mono">${r.reference}</span></div>
 <div class="row"><span class="lbl">Date &amp; Time</span><span class="val" style="font-size:11px">${r.processed_at}</span></div>
-<div class="row"><span class="lbl">Teller</span><span class="val">${r.teller}</span></div>
+<div class="row"><span class="lbl">Teller</span><span class="val">${r.teller ?? '—'}</span></div>
+${remarkHtml}
 <div style="font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:#888;font-weight:700;margin:10px 0 4px">Transfer Route</div>
 <div class="route">
   <div class="acct"><div class="nm">${r.from_customer}</div><div class="no">${r.from_account_number}</div></div>
@@ -147,8 +200,8 @@ function buildTransferHtml(r) {
   <div class="acct r"><div class="nm">${r.to_customer}</div><div class="no">${r.to_account_number}</div></div>
 </div>
 <div class="divider"></div>
-<div class="row"><span class="lbl" style="font-size:13px;font-weight:600">Amount Transferred</span>` +
-    `<span class="big">$${fmt(r.amount)}</span></div>
+<div class="amt-row"><span class="amt-lbl">Amount Transferred</span><span class="big">$${fmt(r.amount)}</span></div>
+${sigHtml}
 </div>
 <div class="ftr"><p>Gobaad Bank — Official Receipt</p><p>Keep this receipt for your records.</p></div>
 </body></html>`
@@ -157,6 +210,14 @@ function buildTransferHtml(r) {
 function printNow() {
     if (!props.receipt) return
     openWin(props.type === 'transfer' ? buildTransferHtml(props.receipt) : buildStdHtml(props.receipt))
+}
+
+/* ─── slip row style helper (avoids escaped quotes in template) ─── */
+function rowStyle(label, isMono) {
+    const base = 'font-weight:600;text-align:right;word-break:break-word;'
+    if (isMono)          return base + 'font-family:monospace;font-size:10px;'
+    if (label === 'Remarks') return 'font-style:italic;color:#555;font-size:10px;text-align:right;word-break:break-word;font-weight:normal;'
+    return base + 'font-size:11px;'
 }
 </script>
 
@@ -190,13 +251,13 @@ function printNow() {
                     </div>
 
                     <!-- Receipt slip preview -->
-                    <div class="px-5 pt-4 pb-3">
+                    <div class="px-5 pt-4 pb-3 max-h-[70vh] overflow-y-auto">
                         <div class="bg-white rounded-xl overflow-hidden shadow-inner"
                              style="font-family: Georgia, 'Times New Roman', serif; font-size: 11px; color: #1a1a1a;">
 
                             <!-- Slip header -->
                             <div style="background:#0B1929;color:#fff;text-align:center;padding:14px 16px 10px">
-                                <img src="/storage/images/MAin Logo.png" style="height:32px;margin:0 auto 6px;display:block" alt=""
+                                <img src="/images/MAin Logo.png" style="height:32px;margin:0 auto 6px;display:block" alt=""
                                      @error="e => e.target.style.display='none'">
                                 <p style="font-size:14px;font-weight:700;letter-spacing:.04em">Gobaad Bank</p>
                                 <p style="font-size:8px;text-transform:uppercase;letter-spacing:.12em;color:#7a9ab5;margin-top:2px">{{ cfg.label }}</p>
@@ -205,12 +266,9 @@ function printNow() {
                             <!-- Standard rows (deposit / withdrawal) -->
                             <div v-if="type !== 'transfer'" style="padding:10px 14px 2px">
                                 <div v-for="([l, v, m]) in slipRows" :key="l"
-                                     style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid #f2f2f2">
-                                    <span style="color:#888;font-size:10px;flex-shrink:0;margin-right:6px">{{ l }}</span>
-                                    <span :style="m ? 'font-family:monospace;font-size:10px;' : 'font-size:11px;'"
-                                          style="font-weight:600;text-align:right;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-                                        {{ v }}
-                                    </span>
+                                     style="display:flex;justify-content:space-between;align-items:flex-start;padding:5px 0;border-bottom:1px solid #f2f2f2;gap:8px">
+                                    <span style="color:#888;font-size:10px;flex-shrink:0;white-space:nowrap">{{ l }}</span>
+                                    <span :style="rowStyle(l, m)">{{ v }}</span>
                                 </div>
                             </div>
 
@@ -228,6 +286,11 @@ function printNow() {
                                     <span style="color:#888;font-size:10px">Teller</span>
                                     <span style="font-size:10px;font-weight:600">{{ receipt.teller }}</span>
                                 </div>
+                                <!-- Remarks (transfer) -->
+                                <div v-if="receipt.remarks" style="display:flex;justify-content:space-between;align-items:flex-start;padding:5px 0;border-bottom:1px solid #f2f2f2;gap:8px">
+                                    <span style="color:#888;font-size:10px;flex-shrink:0">Remarks</span>
+                                    <span style="font-size:10px;font-style:italic;color:#555;text-align:right;word-break:break-word">{{ receipt.remarks }}</span>
+                                </div>
                                 <!-- Route visual -->
                                 <p style="font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#888;font-weight:700;margin:8px 0 3px">Transfer Route</p>
                                 <div style="display:flex;border:1px solid #eee;border-radius:6px;overflow:hidden;margin-bottom:4px">
@@ -244,11 +307,32 @@ function printNow() {
                             </div>
 
                             <!-- Amount row -->
-                            <div style="margin:0 14px;border-top:2px dashed #e8e8e8;padding:8px 0 10px;display:flex;align-items:baseline;justify-content:space-between">
+                            <div style="margin:0 14px;border-top:2px dashed #e8e8e8;padding:8px 0 6px;display:flex;align-items:baseline;justify-content:space-between">
                                 <span style="font-size:11px;font-weight:700;color:#555">{{ cfg.amtLabel }}</span>
                                 <span style="font-size:19px;font-weight:700" :style="{ color: cfg.amtColor }">
                                     {{ cfg.sign }}${{ fmt(receipt.amount) }}
                                 </span>
+                            </div>
+
+                            <!-- Signature section -->
+                            <div style="margin:0 14px 14px;padding-top:10px;border-top:1px dashed #d0d0d0">
+                                <p style="font-size:8.5px;color:#bbb;text-transform:uppercase;letter-spacing:.1em;text-align:center;margin-bottom:12px">Authorized Signatures</p>
+                                <!-- Teller -->
+                                <div style="margin-bottom:16px">
+                                    <div style="height:28px;border-bottom:1.5px solid #ccc;margin-bottom:5px"></div>
+                                    <p style="font-size:9px;color:#999">
+                                        <span style="font-weight:600;color:#777">Teller:</span>
+                                        {{ receipt.teller ?? '—' }}
+                                    </p>
+                                </div>
+                                <!-- Customer -->
+                                <div style="margin-bottom:4px">
+                                    <div style="height:28px;border-bottom:1.5px solid #ccc;margin-bottom:5px"></div>
+                                    <p style="font-size:9px;color:#999">
+                                        <span style="font-weight:600;color:#777">Customer:</span>
+                                        {{ type === 'transfer' ? receipt.from_customer : receipt.customer_name ?? '—' }}
+                                    </p>
+                                </div>
                             </div>
 
                             <!-- Slip footer -->
@@ -260,14 +344,24 @@ function printNow() {
                     </div>
 
                     <!-- Actions -->
-                    <div class="px-5 pb-5 flex gap-2.5 pt-1">
-                        <button @click="printNow"
-                                class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-semibold transition-colors"
-                                :class="cfg.btnCls">
-                            <i class="ti ti-printer"></i> Print Receipt
-                        </button>
+                    <div class="px-5 pb-5 pt-1 space-y-2">
+                        <!-- Row 1: quick popup print + full PDF -->
+                        <div class="flex gap-2.5">
+                            <button @click="printNow"
+                                    class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-semibold transition-colors"
+                                    :class="cfg.btnCls">
+                                <i class="ti ti-printer"></i> Quick Print
+                            </button>
+                            <a v-if="receipt.transaction_id"
+                               :href="route('staff.transaction.receipt', receipt.transaction_id)"
+                               target="_blank"
+                               class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-600 hover:bg-slate-500 text-white text-sm font-semibold transition-colors">
+                                <i class="ti ti-file-type-pdf"></i> Full PDF Receipt
+                            </a>
+                        </div>
+                        <!-- Row 2: done -->
                         <button @click="emit('close')"
-                                class="flex-1 py-2.5 rounded-xl bg-slate-700/80 hover:bg-slate-700 text-slate-200 text-sm font-medium transition-colors">
+                                class="w-full py-2.5 rounded-xl bg-slate-700/80 hover:bg-slate-700 text-slate-200 text-sm font-medium transition-colors">
                             Done
                         </button>
                     </div>
@@ -313,6 +407,10 @@ function printNow() {
                             <div v-if="pendingReceipt.to_customer" class="flex justify-between items-center">
                                 <span class="text-amber-400/55 text-xs">To</span>
                                 <span class="text-white font-medium text-xs">{{ pendingReceipt.to_customer }}</span>
+                            </div>
+                            <div v-if="pendingReceipt.remarks" class="flex justify-between items-start gap-4">
+                                <span class="text-amber-400/55 text-xs shrink-0">Remarks</span>
+                                <span class="text-amber-200/70 text-xs italic text-right">{{ pendingReceipt.remarks }}</span>
                             </div>
                             <div class="pt-2 border-t border-amber-700/20 flex justify-between items-baseline">
                                 <span class="text-amber-400/55 text-xs">Amount Requested</span>

@@ -47,7 +47,7 @@ class LedgerService
                     'branch_id'      => $branchId,
                     'entry_type'     => 'debit',
                     'amount'         => $amount,
-                    'balance_after'  => $vaultAccount->balance + $amount,
+                    'balance_after'  => $vaultAccount->balance - $amount,
                 ]);
                 // Credit customer (liability increases — bank owes customer more)
                 LedgerEntry::create([
@@ -66,6 +66,7 @@ class LedgerService
 
     /**
      * Cash Withdrawal: customer account → vault/till.
+     * Respects overdraft_allowed + overdraft_limit on the account's product type.
      */
     public function withdraw(
         Account $vaultAccount,
@@ -76,9 +77,7 @@ class LedgerService
         string $description = 'Withdrawal',
         bool $pendingApproval = false
     ): Transaction {
-        if ($customerAccount->balance < $amount) {
-            throw new Exception('Insufficient balance in customer account.');
-        }
+        $this->assertWithdrawalAllowed($customerAccount, $amount);
 
         return DB::transaction(function () use (
             $vaultAccount, $customerAccount, $amount,
@@ -113,7 +112,7 @@ class LedgerService
                     'branch_id'      => $branchId,
                     'entry_type'     => 'credit',
                     'amount'         => $amount,
-                    'balance_after'  => $vaultAccount->balance - $amount,
+                    'balance_after'  => $vaultAccount->balance + $amount,
                 ]);
             }
 
@@ -133,9 +132,7 @@ class LedgerService
         string $description = 'Transfer',
         bool $pendingApproval = false
     ): Transaction {
-        if ($fromAccount->balance < $amount) {
-            throw new Exception('Insufficient balance for transfer.');
-        }
+        $this->assertWithdrawalAllowed($fromAccount, $amount);
 
         return DB::transaction(function () use (
             $fromAccount, $toAccount, $amount,
@@ -154,7 +151,7 @@ class LedgerService
             ]);
 
             if (!$pendingApproval) {
-                // Debit sender
+                // Debit sender (belongs to initiating branch)
                 LedgerEntry::create([
                     'transaction_id' => $transaction->id,
                     'account_id'     => $fromAccount->id,
@@ -163,11 +160,13 @@ class LedgerService
                     'amount'         => $amount,
                     'balance_after'  => $fromAccount->balance - $amount,
                 ]);
-                // Credit receiver
+                // Credit receiver — use the receiver account's home branch,
+                // not the initiating branch, so the entry appears on the
+                // correct branch's ledger (critical for inter-branch transfers).
                 LedgerEntry::create([
                     'transaction_id' => $transaction->id,
                     'account_id'     => $toAccount->id,
-                    'branch_id'      => $branchId,
+                    'branch_id'      => $toAccount->home_branch_id ?? $branchId,
                     'entry_type'     => 'credit',
                     'amount'         => $amount,
                     'balance_after'  => $toAccount->balance + $amount,
@@ -185,6 +184,10 @@ class LedgerService
     public function postLedgerEntries(Transaction $transaction): void
     {
         DB::transaction(function () use ($transaction) {
+            if (!$transaction->account_id || !$transaction->to_account_id) {
+                throw new Exception('Transaction is missing account references and cannot be posted.');
+            }
+
             $primary   = Account::findOrFail($transaction->account_id);
             $secondary = Account::findOrFail($transaction->to_account_id);
 
@@ -196,7 +199,7 @@ class LedgerService
                     'branch_id'      => $transaction->branch_id,
                     'entry_type'     => 'debit',
                     'amount'         => $transaction->amount,
-                    'balance_after'  => $secondary->balance + $transaction->amount,
+                    'balance_after'  => $secondary->balance - $transaction->amount,
                 ]);
                 LedgerEntry::create([
                     'transaction_id' => $transaction->id,
@@ -209,9 +212,8 @@ class LedgerService
 
             } elseif ($transaction->type === 'withdrawal') {
                 // Re-check balance at approval time (customer may have withdrawn elsewhere)
-                if ($primary->balance < $transaction->amount) {
-                    throw new Exception('Insufficient balance. Customer account cannot cover this withdrawal anymore.');
-                }
+                // Respects overdraft rules on the account product type.
+                $this->assertWithdrawalAllowed($primary, $transaction->amount, suffix: ' Customer account cannot cover this withdrawal anymore.');
                 // Debit customer (primary), credit vault (secondary)
                 LedgerEntry::create([
                     'transaction_id' => $transaction->id,
@@ -227,14 +229,12 @@ class LedgerService
                     'branch_id'      => $transaction->branch_id,
                     'entry_type'     => 'credit',
                     'amount'         => $transaction->amount,
-                    'balance_after'  => $secondary->balance - $transaction->amount,
+                    'balance_after'  => $secondary->balance + $transaction->amount,
                 ]);
 
             } elseif ($transaction->type === 'transfer') {
-                if ($primary->balance < $transaction->amount) {
-                    throw new Exception('Insufficient balance. Sender account cannot cover this transfer anymore.');
-                }
-                // Debit sender (primary), credit receiver (secondary)
+                $this->assertWithdrawalAllowed($primary, $transaction->amount, suffix: ' Sender account cannot cover this transfer anymore.');
+                // Debit sender (primary) — belongs to the initiating branch
                 LedgerEntry::create([
                     'transaction_id' => $transaction->id,
                     'account_id'     => $primary->id,
@@ -243,10 +243,12 @@ class LedgerService
                     'amount'         => $transaction->amount,
                     'balance_after'  => $primary->balance - $transaction->amount,
                 ]);
+                // Credit receiver (secondary) — use its own home branch so the
+                // entry appears on the correct branch's ledger.
                 LedgerEntry::create([
                     'transaction_id' => $transaction->id,
                     'account_id'     => $secondary->id,
-                    'branch_id'      => $transaction->branch_id,
+                    'branch_id'      => $secondary->home_branch_id ?? $transaction->branch_id,
                     'entry_type'     => 'credit',
                     'amount'         => $transaction->amount,
                     'balance_after'  => $secondary->balance + $transaction->amount,
@@ -255,5 +257,35 @@ class LedgerService
 
             $transaction->update(['status' => 'completed']);
         });
+    }
+
+    /**
+     * Central balance / overdraft guard.
+     * Throws an Exception if the requested amount would breach the account's allowed floor.
+     *
+     * - overdraft_allowed = false  →  balance must be >= amount  (no going negative)
+     * - overdraft_allowed = true   →  balance - amount >= -overdraft_limit
+     *                                  (NULL overdraft_limit = unlimited overdraft)
+     */
+    private function assertWithdrawalAllowed(Account $account, float $amount, string $suffix = ''): void
+    {
+        $type = $account->accountType;
+
+        if (!$type?->overdraft_allowed) {
+            if ($account->balance < $amount) {
+                throw new Exception('Insufficient balance in customer account.' . $suffix);
+            }
+            return;
+        }
+
+        // Overdraft is allowed — check the overdraft ceiling
+        if ($type->overdraft_limit !== null) {
+            $floor = -(float) $type->overdraft_limit;
+            if (($account->balance - $amount) < $floor) {
+                $limit = number_format($type->overdraft_limit, 2);
+                throw new Exception("This transaction would exceed the overdraft limit of \${$limit}." . $suffix);
+            }
+        }
+        // overdraft_limit === null → unlimited overdraft, no check needed
     }
 }

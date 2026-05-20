@@ -111,18 +111,69 @@ class DatabaseSeeder extends Seeder
             'updated_at' => $now,
         ]);
 
+        DB::table('roles')->insertGetId([
+            'role_name' => 'System Admin',
+            'tier' => 'System',
+            'description' => 'IT infrastructure and system configuration',
+            'txn_limit' => null,
+            'branch_restricted' => false,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        DB::table('roles')->insertGetId([
+            'role_name' => 'Operational Manager',
+            'tier' => 'Operations',
+            'description' => 'Oversees daily operations across all branches',
+            'txn_limit' => null,
+            'branch_restricted' => false,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        DB::table('roles')->insertGetId([
+            'role_name' => 'Loan Officer',
+            'tier' => 'Branch',
+            'description' => 'Reviews and processes loan applications',
+            'txn_limit' => null,
+            'branch_restricted' => true,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        DB::table('roles')->insertGetId([
+            'role_name' => 'Internal Auditor',
+            'tier' => 'Operations',
+            'description' => 'Audits transactions and compliance records',
+            'txn_limit' => null,
+            'branch_restricted' => false,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        DB::table('roles')->insertGetId([
+            'role_name' => 'Accounting Officer',
+            'tier' => 'Operations',
+            'description' => 'General ledger, trial balance and reconciliation',
+            'txn_limit' => null,
+            'branch_restricted' => false,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
         // 5. Seed Super Admin Staff
         DB::table('staff')->updateOrInsert(
-            ['email' => 'admin@bank.local'],
+            ['ident_number' => 'ADM-001'],
             [
-                'full_name' => 'System Administrator',
+                'full_name'    => 'System Administrator',
+                'email'        => 'abdallasport12@gmail.com',
                 'ident_number' => 'ADM-001',
-                'password' => Hash::make('password'),
-                'role_id' => $superAdminRoleId,
-                'branch_id' => $branchMain,
-                'status' => 'active',
-                'created_at' => $now,
-                'updated_at' => $now,
+                'password'     => Hash::make('password'),
+                'role_id'      => $superAdminRoleId,
+                'branch_id'    => $branchMain,
+                'status'       => 'active',
+                'created_at'   => $now,
+                'updated_at'   => $now,
             ]
         );
         
@@ -138,4 +189,10 @@ class DatabaseSeeder extends Seeder
 
         $this->command->info('Database seeded successfully.');
     }
-}
+
+    public function seedSar(): void
+    {
+        $this->call(SarSeeder::class);
+    }
+    }
+

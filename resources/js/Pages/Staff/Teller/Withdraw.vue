@@ -19,7 +19,7 @@ const fmt  = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2
 const fmtD = (d) => new Date(d).toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
 
 /* ── Form ── */
-const form = useForm({ account_number: '', amount: '' });
+const form = useForm({ account_number: '', amount: '', remarks: '' });
 
 /* ── Limit check ── */
 const page      = usePage();
@@ -93,7 +93,7 @@ const buildHtml = (rows, title, amtLabel, amtValue, amtColor, extra = '') => `
   @media print{body{width:100%}}
 </style></head><body>
 <div class="hdr">
-  <img src="/storage/images/MAin Logo.png" alt="Gobaad Bank" onerror="this.style.display='none'">
+  <img src="/images/MAin Logo.png" alt="Gobaad Bank" onerror="this.style.display='none'">
   <h1>Gobaad Bank</h1><p>${title}</p>
 </div>
 <div class="body">
@@ -229,6 +229,14 @@ const submitCancel  = ()    => {
                 <p v-if="form.errors.amount" class="text-[11px] text-[#E2635A]">{{ form.errors.amount }}</p>
               </div>
 
+              <!-- Remarks -->
+              <div class="space-y-1.5">
+                <label class="text-[11.5px] text-[#A9B8C6] font-medium tracking-wide">Remarks <span class="text-[#6B7E8E] font-normal">(optional)</span></label>
+                <textarea v-model="form.remarks" rows="2" placeholder="Additional notes or purpose of this withdrawal…"
+                          class="w-full text-sm text-[#F0EBE1] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded-lg px-4 py-2.5 outline-none focus:border-[#E8A830] transition resize-none placeholder-[#3a5060]"></textarea>
+                <p v-if="form.errors.remarks" class="text-[11px] text-[#E2635A]">{{ form.errors.remarks }}</p>
+              </div>
+
               <div v-if="form.errors.error" class="p-3 rounded-lg bg-[rgba(226,99,90,0.08)] border border-[#E2635A]/30 text-[#E2635A] text-sm flex gap-2">
                 <i class="ti ti-alert-circle shrink-0 mt-0.5"></i>{{ form.errors.error }}
               </div>
@@ -343,10 +351,12 @@ const submitCancel  = ()    => {
                     </td>
                     <td class="px-3 py-3">
                       <div class="flex items-center justify-center gap-1.5">
-                        <button v-if="txn.status === 'completed'" @click="doPrint(txn)" title="Print receipt"
-                                class="w-7 h-7 rounded-lg flex items-center justify-center bg-[rgba(201,168,76,0.08)] text-[#C9A84C] border border-[rgba(201,168,76,0.2)] hover:bg-[rgba(201,168,76,0.18)] transition text-xs">
-                          <i class="ti ti-printer"></i>
-                        </button>
+                        <a v-if="txn.status === 'completed'"
+                           :href="route('staff.transaction.receipt', txn.id)"
+                           target="_blank" title="Open PDF receipt"
+                           class="w-7 h-7 rounded-lg flex items-center justify-center bg-[rgba(201,168,76,0.08)] text-[#C9A84C] border border-[rgba(201,168,76,0.2)] hover:bg-[rgba(201,168,76,0.18)] transition text-xs">
+                          <i class="ti ti-receipt"></i>
+                        </a>
                         <button v-if="txn.can_reverse && txn.status === 'completed'" @click="confirmReverse(txn)" title="Reverse transaction"
                                 class="w-7 h-7 rounded-lg flex items-center justify-center bg-[rgba(226,99,90,0.08)] text-[#E2635A] border border-[rgba(226,99,90,0.2)] hover:bg-[rgba(226,99,90,0.18)] transition text-xs">
                           <i class="ti ti-arrow-back-up"></i>

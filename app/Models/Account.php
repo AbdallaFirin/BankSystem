@@ -10,24 +10,21 @@ class Account extends Model
     protected $guarded = [];
     protected $appends = ['balance'];
     protected $casts = [
-        'is_frozen' => 'boolean',
-        'frozen_at' => 'datetime',
+        'is_frozen'  => 'boolean',
+        'frozen_at'  => 'datetime',
+        'opened_at'  => 'datetime',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     /**
-     * Dynamically compute balance: SUM(Credits) - SUM(Debits).
+     * Dynamically compute balance: SUM(Credits) - SUM(Debits) in one query.
      */
-    public function getBalanceAttribute()
+    public function getBalanceAttribute(): float
     {
-        $credits = LedgerEntry::where('account_id', $this->id)
-                    ->where('entry_type', 'credit')
-                    ->sum('amount');
-                    
-        $debits = LedgerEntry::where('account_id', $this->id)
-                    ->where('entry_type', 'debit')
-                    ->sum('amount');
-                    
-        return $credits - $debits;
+        return (float) LedgerEntry::where('account_id', $this->id)
+            ->selectRaw("SUM(CASE WHEN entry_type = 'credit' THEN amount ELSE -amount END) as bal")
+            ->value('bal') ?? 0.0;
     }
 
     public function customer()
@@ -53,5 +50,10 @@ class Account extends Model
     public function frozenBy()
     {
         return $this->belongsTo(Staff::class, 'frozen_by');
+    }
+
+    public function freezeLogs()
+    {
+        return $this->hasMany(AccountFreezeLog::class)->orderByDesc('created_at');
     }
 }

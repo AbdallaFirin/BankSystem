@@ -24,17 +24,12 @@ const form = useForm({
     session_type: 'closing',
     notes: '',
     denominations: [
-        { denomination: 100,  label: '$100',  type: 'Bill', quantity: 0 },
-        { denomination: 50,   label: '$50',   type: 'Bill', quantity: 0 },
-        { denomination: 20,   label: '$20',   type: 'Bill', quantity: 0 },
-        { denomination: 10,   label: '$10',   type: 'Bill', quantity: 0 },
-        { denomination: 5,    label: '$5',    type: 'Bill', quantity: 0 },
-        { denomination: 1,    label: '$1',    type: 'Bill', quantity: 0 },
-        { denomination: 0.50, label: '50¢',   type: 'Coin', quantity: 0 },
-        { denomination: 0.25, label: '25¢',   type: 'Coin', quantity: 0 },
-        { denomination: 0.10, label: '10¢',   type: 'Coin', quantity: 0 },
-        { denomination: 0.05, label: '5¢',    type: 'Coin', quantity: 0 },
-        { denomination: 0.01, label: '1¢',    type: 'Coin', quantity: 0 },
+        { denomination: 100, label: '$100', type: 'Bill', quantity: 0 },
+        { denomination: 50,  label: '$50',  type: 'Bill', quantity: 0 },
+        { denomination: 20,  label: '$20',  type: 'Bill', quantity: 0 },
+        { denomination: 10,  label: '$10',  type: 'Bill', quantity: 0 },
+        { denomination: 5,   label: '$5',   type: 'Bill', quantity: 0 },
+        { denomination: 1,   label: '$1',   type: 'Bill', quantity: 0 },
     ],
 })
 
@@ -249,19 +244,7 @@ ${count.notes ? `<div class="notes"><strong>Notes:</strong> ${count.notes}</div>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-800">
-                <!-- Bills separator -->
-                <tr class="bg-slate-800/30">
-                  <td colspan="4" class="px-5 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-widest">
-                    Bills
-                  </td>
-                </tr>
                 <template v-for="(row, i) in form.denominations" :key="i">
-                  <!-- Coins separator -->
-                  <tr v-if="i === 6" class="bg-slate-800/30">
-                    <td colspan="4" class="px-5 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-widest">
-                      Coins
-                    </td>
-                  </tr>
                   <tr class="hover:bg-slate-800/40 transition-colors">
                     <!-- Denomination label -->
                     <td class="px-5 py-3">
@@ -269,7 +252,7 @@ ${count.notes ? `<div class="notes"><strong>Notes:</strong> ${count.notes}</div>
                         <span class="w-14 text-center bg-slate-800 border border-slate-600 rounded-lg py-1 text-sm font-bold font-mono text-white">
                           {{ row.label }}
                         </span>
-                        <span class="text-slate-400 text-sm">note</span>
+                        <span class="text-slate-400 text-sm">{{ row.type === 'Bill' ? 'bill' : 'coin' }}</span>
                       </span>
                     </td>
                     <!-- Type -->
@@ -327,7 +310,7 @@ ${count.notes ? `<div class="notes"><strong>Notes:</strong> ${count.notes}</div>
                 <span class="font-mono font-semibold text-white">{{ fmt(physicalTotal) }}</span>
               </div>
               <div class="flex items-center justify-between text-sm">
-                <span class="text-slate-400">System / Vault</span>
+                <span class="text-slate-400">{{ balance_label }}</span>
                 <span class="font-mono font-semibold text-white">{{ fmt(system_balance) }}</span>
               </div>
               <div class="border-t border-slate-700 pt-3 flex items-center justify-between">

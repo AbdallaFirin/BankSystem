@@ -320,27 +320,99 @@
         </div>
       </div>
 
+      <!-- ════════ TAB: Transaction Limits ════════ -->
+      <div v-show="activeTab === 'limits'">
+        <div class="bg-slate-900 border border-slate-700/60 rounded-2xl overflow-hidden">
+          <div class="px-6 py-4 border-b border-slate-800">
+            <h2 class="font-semibold text-white">Transaction Limits by Role</h2>
+            <p class="text-xs text-slate-500 mt-0.5">
+              Transactions above a role's limit require supervisor approval. Leave blank for no limit.
+            </p>
+          </div>
+
+          <div class="divide-y divide-slate-800">
+            <div v-for="role in props.roles" :key="role.id"
+                 class="flex items-center justify-between gap-4 px-6 py-4 hover:bg-slate-800/30 transition-colors">
+
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                     :class="roleColor(role.role_name).replace('text-', 'bg-').replace('/40', '/20').replace('bg-slate-700', 'bg-slate-700')">
+                  <i class="ti ti-user-shield text-sm" :class="roleColor(role.role_name).split(' ').find(c => c.startsWith('text-'))"></i>
+                </div>
+                <div>
+                  <p class="text-sm font-medium text-white">{{ role.role_name }}</p>
+                  <p class="text-xs text-slate-500 mt-0.5">
+                    {{ role.txn_limit != null
+                        ? 'Limit: $' + fmt(role.txn_limit) + ' per transaction'
+                        : 'No limit set — all transactions processed immediately' }}
+                  </p>
+                </div>
+              </div>
+
+              <form @submit.prevent="saveLimit(role)"
+                    class="flex items-center gap-2 shrink-0">
+                <div class="relative">
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                  <input
+                    v-model="limitInputs[role.id]"
+                    type="number" step="0.01" min="0"
+                    placeholder="No limit"
+                    class="w-36 bg-slate-800 border border-slate-600 rounded-xl pl-7 pr-3 py-2 text-sm text-white
+                           placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#C9A84C]/50 focus:border-[#C9A84C]/60 transition-colors"
+                  />
+                </div>
+                <button type="submit"
+                        :disabled="savingLimit[role.id]"
+                        class="px-4 py-2 bg-[#C9A84C] hover:bg-[#b8973e] disabled:opacity-50 text-[#070F1A] text-sm font-semibold rounded-xl transition-colors whitespace-nowrap">
+                  {{ savingLimit[role.id] ? '…' : 'Set' }}
+                </button>
+                <button v-if="limitInputs[role.id] !== '' && limitInputs[role.id] != null"
+                        type="button"
+                        @click="clearLimit(role)"
+                        :disabled="savingLimit[role.id]"
+                        class="px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-300 text-sm rounded-xl transition-colors"
+                        title="Remove limit">
+                  <i class="ti ti-x"></i>
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <div class="px-6 py-4 bg-slate-800/30 border-t border-slate-800">
+            <div class="flex items-start gap-2 text-xs text-slate-500">
+              <i class="ti ti-info-circle mt-0.5 shrink-0"></i>
+              <span>
+                These limits apply globally to all branches. A teller with a $5,000 limit must route anything above that to a
+                <strong class="text-slate-400">Teller Supervisor</strong> or <strong class="text-slate-400">Branch Manager</strong> for approval.
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { Link, useForm, usePage } from '@inertiajs/vue3'
+import { ref, computed, reactive } from 'vue'
+import { Link, useForm, usePage, router } from '@inertiajs/vue3'
 
 const props = defineProps({
   branch:    { type: Object, required: true },
   stats:     { type: Object, default: () => ({}) },
   staff_list:{ type: Array,  default: () => [] },
+  roles:     { type: Array,  default: () => [] },
 })
 
 /* ── Tabs ── */
 const activeTab = ref('profile')
 const tabs = [
-  { id: 'profile', label: 'Branch Profile',   icon: 'ti ti-building' },
-  { id: 'hours',   label: 'Operating Hours',  icon: 'ti ti-clock' },
-  { id: 'vault',   label: 'Vault & Cash',     icon: 'ti ti-building-bank' },
-  { id: 'staff',   label: 'Staff',            icon: 'ti ti-users' },
+  { id: 'profile', label: 'Branch Profile',      icon: 'ti ti-building' },
+  { id: 'hours',   label: 'Operating Hours',     icon: 'ti ti-clock' },
+  { id: 'vault',   label: 'Vault & Cash',        icon: 'ti ti-building-bank' },
+  { id: 'staff',   label: 'Staff',               icon: 'ti ti-users' },
+  { id: 'limits',  label: 'Transaction Limits',  icon: 'ti ti-shield-dollar' },
 ]
 
 /* ── Stats ── */
@@ -402,6 +474,31 @@ function saveThreshold() {
     preserveScroll: true,
     onFinish: () => { savingThreshold.value = false },
   })
+}
+
+/* ── Transaction Limits ── */
+const limitInputs = reactive(
+  Object.fromEntries(props.roles.map(r => [r.id, r.txn_limit ?? '']))
+)
+const savingLimit = reactive(
+  Object.fromEntries(props.roles.map(r => [r.id, false]))
+)
+
+function saveLimit(role) {
+  savingLimit[role.id] = true
+  router.put(
+    route('staff.branch.settings.role-limit', role.id),
+    { txn_limit: limitInputs[role.id] === '' ? null : limitInputs[role.id] },
+    {
+      preserveScroll: true,
+      onFinish: () => { savingLimit[role.id] = false },
+    }
+  )
+}
+
+function clearLimit(role) {
+  limitInputs[role.id] = ''
+  saveLimit(role)
 }
 
 /* ── Static data ── */

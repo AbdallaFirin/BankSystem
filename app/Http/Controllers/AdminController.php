@@ -10,7 +10,9 @@ use App\Models\Customer;
 use App\Models\Transaction;
 use App\Models\AccountType;
 use App\Models\Role;
+use App\Services\NotificationService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class AdminController extends Controller
 {
@@ -143,14 +145,23 @@ class AdminController extends Controller
     {
         $request->validate([
             'branch_name' => 'required|string|max:255',
-            'city' => 'required|string|max:255',
-            'address' => 'required|string',
-            'phone' => 'required|string',
+            'branch_code' => 'nullable|string|max:10|unique:branches,branch_code|regex:/^[A-Z0-9]+$/',
+            'city'        => 'required|string|max:255',
+            'address'     => 'required|string',
+            'phone'       => 'required|string',
         ]);
 
-        Branch::create($request->all() + ['status' => 'active', 'opened_at' => now()]);
+        // Auto-generate the next branch_number: max existing + 1, floor at 101.
+        $nextNumber = Branch::max('branch_number');
+        $nextNumber = $nextNumber ? $nextNumber + 1 : 101;
 
-        return back()->with('success', "Branch {$request->branch_name} successfully established.");
+        $branch = Branch::create(
+            $request->only('branch_name', 'branch_code', 'city', 'address', 'phone')
+            + ['branch_number' => $nextNumber, 'status' => 'active', 'opened_at' => now()]
+        );
+
+        $fullCode = ($branch->branch_code ?? '') . $branch->branch_number;
+        return back()->with('success', "Branch {$branch->branch_name} established — Code: {$fullCode}");
     }
 
     public function roleIndex()
@@ -186,11 +197,44 @@ class AdminController extends Controller
         return back()->with('success', "Permissions for {$role->role_name} have been updated.");
     }
 
+    public function updateStaff(Request $request, $id)
+    {
+        $staff = Staff::findOrFail($id);
+
+        $request->validate([
+            'full_name' => 'required|string|max:255',
+            'email'     => "required|email|unique:staff,email,{$id}",
+            'phone'     => "required|string|unique:staff,phone,{$id}",
+            'role_id'   => 'required|exists:roles,id',
+            'branch_id' => 'required|exists:branches,id',
+        ]);
+
+        $staff->update($request->only('full_name', 'email', 'phone', 'role_id', 'branch_id'));
+
+        return back()->with('success', "Staff profile for {$staff->full_name} updated.");
+    }
+
+    public function resetStaffPassword(Request $request, $id)
+    {
+        $request->validate([
+            'password' => 'required|min:8|confirmed',
+        ]);
+
+        $staff = Staff::findOrFail($id);
+        $staff->update([
+            'password'              => Hash::make($request->password),
+            'force_password_change' => true,
+            'temp_password'         => $request->password,
+        ]);
+
+        return back()->with('success', "Password for {$staff->full_name} has been reset. They will be required to change it on next login.");
+    }
+
     public function updateStaffStatus(Request $request, $id)
     {
         $staff = Staff::findOrFail($id);
         $newStatus = $request->status === 'active' ? 'active' : 'inactive';
-        
+
         $staff->update(['status' => $newStatus]);
 
         return back()->with('success', "Staff account for {$staff->full_name} is now {$newStatus}.");
@@ -226,15 +270,45 @@ class AdminController extends Controller
     {
         $request->validate([
             'branch_name' => 'required|string|max:255',
+            'branch_code' => "nullable|string|max:10|unique:branches,branch_code,{$id}|regex:/^[A-Z0-9]+$/",
             'city'        => 'required|string|max:255',
             'address'     => 'required|string',
             'phone'       => 'required|string',
         ]);
 
-        $branch = Branch::findOrFail($id);
-        $branch->update($request->only('branch_name', 'city', 'address', 'phone'));
+        $branch      = Branch::findOrFail($id);
+        $oldFullCode = $branch->full_code; // e.g. "101" (before prefix set)
 
-        return back()->with('success', "Branch {$branch->branch_name} updated successfully.");
+        // branch_number is never changed — only the prefix can be updated.
+        $branch->update($request->only('branch_name', 'branch_code', 'city', 'address', 'phone'));
+        $branch->refresh();
+
+        $newFullCode = $branch->full_code; // e.g. "MOG101" (after prefix set)
+
+        // ── Auto-reformat existing account numbers when the prefix changes ──
+        // e.g. "101000001" → "MOG101000001", "BOS106000001" → "MOG106000001"
+        if ($newFullCode !== $oldFullCode && $newFullCode !== '') {
+            $accounts = Account::where('home_branch_id', $branch->id)
+                ->where('account_number', 'not like', 'VAULT-%')
+                ->where('account_number', 'not like', 'TILL-%')
+                ->orderBy('id')
+                ->get(['id', 'account_number']);
+
+            $seq = 1;
+            foreach ($accounts as $account) {
+                $newNumber = $newFullCode . str_pad($seq, 6, '0', STR_PAD_LEFT);
+                // Collision guard
+                while (Account::where('account_number', $newNumber)
+                               ->where('id', '!=', $account->id)->exists()) {
+                    $seq++;
+                    $newNumber = $newFullCode . str_pad($seq, 6, '0', STR_PAD_LEFT);
+                }
+                $account->update(['account_number' => $newNumber]);
+                $seq++;
+            }
+        }
+
+        return back()->with('success', "Branch {$branch->branch_name} updated — Code: {$newFullCode}");
     }
 
     public function updateBranchStatus(Request $request, $id)
@@ -296,6 +370,7 @@ class AdminController extends Controller
             'min_balance'      => 'required|numeric|min:0',
             'withdrawal_limit' => 'nullable|numeric|min:0',
             'overdraft_allowed'=> 'boolean',
+            'overdraft_limit'  => 'nullable|numeric|min:0',
         ]);
 
         AccountType::create([
@@ -304,6 +379,7 @@ class AdminController extends Controller
             'min_balance'       => $request->min_balance,
             'withdrawal_limit'  => $request->withdrawal_limit,
             'overdraft_allowed' => $request->boolean('overdraft_allowed'),
+            'overdraft_limit'   => $request->boolean('overdraft_allowed') ? $request->overdraft_limit : null,
             'is_active'         => true,
         ]);
 
@@ -318,6 +394,7 @@ class AdminController extends Controller
             'min_balance'      => 'required|numeric|min:0',
             'withdrawal_limit' => 'nullable|numeric|min:0',
             'overdraft_allowed'=> 'boolean',
+            'overdraft_limit'  => 'nullable|numeric|min:0',
         ]);
 
         $type = AccountType::findOrFail($id);
@@ -327,6 +404,7 @@ class AdminController extends Controller
             'min_balance'       => $request->min_balance,
             'withdrawal_limit'  => $request->withdrawal_limit,
             'overdraft_allowed' => $request->boolean('overdraft_allowed'),
+            'overdraft_limit'   => $request->boolean('overdraft_allowed') ? $request->overdraft_limit : null,
         ]);
 
         return back()->with('success', "Account product '{$type->type_name}' updated.");
@@ -348,14 +426,34 @@ class AdminController extends Controller
     // Customer Management
     // -------------------------------------------------------------------------
 
-    public function customerIndex()
+    public function customerIndex(\Illuminate\Http\Request $request)
     {
-        $customers = Customer::with('branch')
-            ->orderBy('full_name')
-            ->paginate(25);
+        $query = Customer::with('branch')
+            ->where('phone', 'not like', 'SYS-%');
+
+        if ($search = $request->search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('full_name', 'like', "%{$search}%")
+                  ->orWhere('id_number', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%");
+            });
+        }
+
+        if ($kyc = $request->kyc_status) {
+            $query->where('kyc_status', $kyc);
+        }
+
+        if ($branch = $request->branch_id) {
+            $query->where('home_branch_id', $branch);
+        }
+
+        $customers = $query->orderBy('full_name')->paginate(25)->withQueryString();
+        $branches  = \App\Models\Branch::orderBy('branch_name')->get(['id', 'branch_name']);
 
         return \Inertia\Inertia::render('Staff/Admin/Customers', [
             'customers' => $customers,
+            'branches'  => $branches,
+            'filters'   => $request->only('search', 'kyc_status', 'branch_id'),
         ]);
     }
 
@@ -369,6 +467,94 @@ class AdminController extends Controller
         $customer->update(['status' => $request->status]);
 
         return back()->with('success', "Customer {$customer->full_name} status set to {$request->status}.");
+    }
+
+    /* ─────────────────────────────────────────────
+     *  GET /staff/admin/portal-access
+     *  Show how many verified customers have no password yet
+     * ───────────────────────────────────────────── */
+    public function portalAccessIndex()
+    {
+        $base = Customer::where('kyc_status', 'verified')
+            ->where('phone', 'not like', 'SYS-%');
+
+        $withoutAccess = (clone $base)->whereNull('password')->count();
+        $totalVerified = (clone $base)->count();
+        $withoutEmail  = (clone $base)->whereNull('password')->whereNull('email')->count();
+
+        return \Inertia\Inertia::render('Staff/Admin/PortalAccess', [
+            'without_access' => $withoutAccess,
+            'total_verified' => $totalVerified,
+            'without_email'  => $withoutEmail,
+        ]);
+    }
+
+    /* ─────────────────────────────────────────────
+     *  POST /staff/admin/portal-access/bulk-send
+     *  Generate temp passwords for all verified customers who have none
+     * ───────────────────────────────────────────── */
+    public function bulkSendPortalAccess()
+    {
+        $customers = Customer::where('kyc_status', 'verified')
+            ->where('phone', 'not like', 'SYS-%')
+            ->whereNull('password')
+            ->get();
+
+        if ($customers->isEmpty()) {
+            return back()->with('success', 'All verified customers already have portal access.');
+        }
+
+        $notificationService = app(NotificationService::class);
+        $sent      = 0;
+        $noEmail   = 0;
+
+        foreach ($customers as $customer) {
+            $birthYear    = $customer->dob ? date('Y', strtotime($customer->dob)) : date('Y');
+            $tempPassword = substr(preg_replace('/\D/', '', $customer->phone), -4) . $birthYear;
+
+            // Always set the password so the customer can log in
+            $customer->update([
+                'password'             => Hash::make($tempPassword),
+                'must_change_password' => true,
+            ]);
+
+            // Only send email if the customer has an email address
+            if (!empty($customer->email)) {
+                $notificationService->send(
+                    recipientId:   $customer->id,
+                    recipientType: 'customer',
+                    message:       'Your Gobaad Bank customer portal has been activated. Log in with your phone number and the temporary password sent to your email.',
+                    subject:       'Customer Portal Access — Temporary Password',
+                    mailView:      'kyc-status',
+                    mailData:      [
+                        'customerName' => $customer->full_name,
+                        'customerId'   => $customer->id,
+                        'phone'        => $customer->phone,
+                        'status'       => 'approved',
+                        'decidedAt'    => now()->format('d M Y, H:i:s'),
+                        'tempPassword' => $tempPassword,
+                    ]
+                );
+                $sent++;
+            } else {
+                // Store in-app notification only (no email)
+                \App\Models\Notification::create([
+                    'recipient_id'   => $customer->id,
+                    'recipient_type' => 'customer',
+                    'channel'        => 'in_app',
+                    'message'        => 'Your customer portal access has been activated. Log in with your phone number and your temporary password.',
+                    'status'         => 'pending',
+                ]);
+                $noEmail++;
+            }
+        }
+
+        $msg = "Passwords set for " . ($sent + $noEmail) . " customer(s). {$sent} email(s) sent.";
+        if ($noEmail > 0) {
+            $msg .= " {$noEmail} customer(s) had no email address — their password was set but no email was sent. Please update their profiles.";
+        }
+
+        return back()->with('success', $msg);
     }
 
     // -------------------------------------------------------------------------

@@ -160,7 +160,7 @@ tr.rev td { color: #b0b8c4; text-decoration: line-through; }
 
         {{-- Centre: bank logo image --}}
         <td width="34%" align="center" valign="middle" style="padding: 8px 0;">
-            <img src="{{ storage_path('app/public/images/MAin Logo.png') }}"
+            <img src="{{ public_path('images/MAin Logo.png') }}"
                  alt="Gobaad Bank"
                  style="height:50px; width:auto; display:block; margin:0 auto 4px auto;" />
             <div style="text-align:center; font-size:9px; color:#555555;">Official account statement</div>
@@ -466,7 +466,7 @@ tr.rev td { color: #b0b8c4; text-decoration: line-through; }
                 @endif
             </td>
             <td align="right" style="font-size:9px; color:#85B7EB;">
-                Gobaad Bank &nbsp;&middot;&nbsp; {{ $branchName }}@if(!empty($account->homeBranch->phone)) &nbsp;&middot;&nbsp; {{ $account->homeBranch->phone }}@endif
+                Gobaad Bank &nbsp;&middot;&nbsp; {{ $branchName }}@if(!empty($account->homeBranch->swift_code)) &nbsp;&middot;&nbsp; SWIFT: {{ $account->homeBranch->swift_code }}@endif@if(!empty($account->homeBranch->phone)) &nbsp;&middot;&nbsp; {{ $account->homeBranch->phone }}@endif
             </td>
         </tr>
     </table>

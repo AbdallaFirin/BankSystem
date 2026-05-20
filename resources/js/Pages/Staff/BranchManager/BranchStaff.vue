@@ -38,6 +38,31 @@
         </div>
       </Transition>
 
+      <!-- Filters -->
+      <div class="flex flex-wrap gap-3">
+        <input v-model="filters.search" @input="applyFilters"
+               type="text" placeholder="Search name, ID, email, phone…"
+               class="flex-1 min-w-[200px] bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500
+                      focus:outline-none focus:ring-2 focus:ring-[#C9A84C]/50 focus:border-[#C9A84C]/60 transition-colors" />
+        <select v-model="filters.role_id" @change="applyFilters"
+                class="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white
+                       focus:outline-none focus:ring-2 focus:ring-[#C9A84C]/50 focus:border-[#C9A84C]/60 transition-colors">
+          <option value="">All Roles</option>
+          <option v-for="r in props.roles" :key="r.id" :value="r.id">{{ r.role_name }}</option>
+        </select>
+        <select v-model="filters.status" @change="applyFilters"
+                class="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white
+                       focus:outline-none focus:ring-2 focus:ring-[#C9A84C]/50 focus:border-[#C9A84C]/60 transition-colors">
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        <button v-if="filters.search || filters.role_id || filters.status" @click="clearFilters"
+                class="px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-400 hover:text-white text-sm transition-colors">
+          Clear
+        </button>
+      </div>
+
       <!-- Staff Table -->
       <div class="bg-slate-900 border border-slate-700/60 rounded-2xl overflow-hidden">
         <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
@@ -209,13 +234,39 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, reactive } from 'vue'
 import { Link, useForm, router } from '@inertiajs/vue3'
 
 const props = defineProps({
   staff_list: { type: Array, default: () => [] },
   roles:      { type: Array, default: () => [] },
+  filters:    { type: Object, default: () => ({}) },
 })
+
+const filters = reactive({
+  search:  props.filters.search  ?? '',
+  role_id: props.filters.role_id ?? '',
+  status:  props.filters.status  ?? '',
+})
+
+let filterTimer = null
+function applyFilters() {
+  clearTimeout(filterTimer)
+  filterTimer = setTimeout(() => {
+    router.get(route('staff.branch.staff.index'), {
+      search:  filters.search  || undefined,
+      role_id: filters.role_id || undefined,
+      status:  filters.status  || undefined,
+    }, { preserveState: true, replace: true })
+  }, 300)
+}
+
+function clearFilters() {
+  filters.search  = ''
+  filters.role_id = ''
+  filters.status  = ''
+  router.get(route('staff.branch.staff.index'), {}, { preserveState: true, replace: true })
+}
 
 /* ── Modal state ── */
 const showModal    = ref(false)

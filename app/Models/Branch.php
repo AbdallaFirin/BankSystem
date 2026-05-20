@@ -14,6 +14,18 @@ class Branch extends Model
         'opened_at'           => 'datetime',
     ];
 
+    protected $appends = ['full_code'];
+
+    /**
+     * Full routing code = branch_code prefix + branch_number.
+     * e.g. "BOS" + 101 = "BOS101"
+     * If the prefix hasn't been set yet, returns just the number (e.g. "101").
+     */
+    public function getFullCodeAttribute(): string
+    {
+        return ($this->branch_code ?? '') . ($this->branch_number ?? '');
+    }
+
     public function staff()
     {
         return $this->hasMany(Staff::class);

@@ -61,7 +61,7 @@ const selectAccount = (type) => {
     <div class="hdr">
       <div class="hdr-left">
         <div class="bank-mark">
-          <img src="/storage/images/MAin Logo.png" alt="Gobaad Bank" style="height:36px;width:auto;object-fit:contain;" />
+          <img src="/images/MAin Logo.png" alt="Gobaad Bank" style="height:36px;width:auto;object-fit:contain;" />
           <span class="bank-id">Gobaad Bank</span>
         </div>
         <div class="form-heading">New Customer<br><em>Registration</em></div>
@@ -110,21 +110,21 @@ const selectAccount = (type) => {
           </div>
           <div class="field">
             <label class="label">Gender<span class="req">*</span></label>
-            <select v-model="form.gender" required><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option><option>Prefer not to say</option></select>
+            <select v-model="form.gender" required><option value=""></option><option>Male</option><option>Female</option><option>Other</option><option>Prefer not to say</option></select>
           </div>
           <div class="field">
             <label class="label">Marital status</label>
-            <select v-model="form.marital_status"><option value="">Select</option><option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option></select>
+            <select v-model="form.marital_status"><option value=""></option><option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option></select>
           </div>
         </div>
         <div class="grid g2 mt">
           <div class="field">
             <label class="label">Nationality<span class="req">*</span></label>
-            <select v-model="form.nationality" required><option value="">Select country</option><option>Somali</option><option>Kenyan</option><option>Ethiopian</option><option>Other</option></select>
+            <input type="text" v-model="form.nationality" placeholder="e.g. Somali" required />
           </div>
           <div class="field">
             <label class="label">Religion</label>
-            <select v-model="form.religion"><option value="">Select</option><option>Islam</option><option>Christianity</option><option>Other</option><option>Prefer not to say</option></select>
+            <input type="text" v-model="form.religion" placeholder="e.g. Islam" />
           </div>
         </div>
       </div>
@@ -139,7 +139,20 @@ const selectAccount = (type) => {
         <div class="grid g2">
           <div class="field">
             <label class="label">ID type<span class="req">*</span></label>
-            <select v-model="form.id_type" required><option value="">Select</option><option>National ID Card</option><option>Passport</option><option>Driver's License</option><option>Voter Card</option><option>Refugee ID</option></select>
+            <select v-model="form.id_type" required>
+              <option value=""></option>
+              <option>National ID Card</option>
+              <option>Passport</option>
+              <option>Driver's License</option>
+              <option>Voter Registration Card</option>
+              <option>Refugee ID</option>
+              <option>Alien Certificate</option>
+              <option>Military ID</option>
+              <option>Government Employee ID</option>
+              <option>Student ID</option>
+              <option>Birth Certificate</option>
+              <option>Other</option>
+            </select>
           </div>
           <div class="field">
             <label class="label">ID number<span class="req">*</span></label>
@@ -188,12 +201,12 @@ const selectAccount = (type) => {
         </div>
         <div class="grid g3 mt">
           <div class="field">
-            <label class="label">Region / City<span class="req">*</span></label>
-            <input type="text" v-model="form.region" placeholder="e.g. Garoowe" required />
+            <label class="label">Region / State<span class="req">*</span></label>
+            <input type="text" v-model="form.region" placeholder="e.g. Banaadir, Nugaal" required />
           </div>
           <div class="field">
-            <label class="label">District</label>
-            <input type="text" v-model="form.district" placeholder="e.g. Nugaal" />
+            <label class="label">District / Area</label>
+            <input type="text" v-model="form.district" placeholder="e.g. Waberi, Hodan" />
           </div>
           <div class="field">
             <label class="label">Street / Neighbourhood</label>
@@ -212,7 +225,22 @@ const selectAccount = (type) => {
         <div class="grid g2">
           <div class="field">
             <label class="label">Employment status<span class="req">*</span></label>
-            <select v-model="form.employment_status" required><option value="">Select</option><option>Employed (Private)</option><option>Employed (Government)</option><option>Self-employed</option><option>Business owner</option><option>Student</option><option>Unemployed</option><option>Retired</option></select>
+            <select v-model="form.employment_status" required>
+              <option value=""></option>
+              <option>Employed — Private Sector</option>
+              <option>Employed — Government / Civil Servant</option>
+              <option>Employed — NGO / International Org</option>
+              <option>Employed — Military / Police</option>
+              <option>Self-employed / Freelancer</option>
+              <option>Business Owner</option>
+              <option>Trader / Merchant</option>
+              <option>Farmer / Livestock Herder</option>
+              <option>Student</option>
+              <option>Housewife / Homemaker</option>
+              <option>Retired</option>
+              <option>Unemployed</option>
+              <option>Other</option>
+            </select>
           </div>
           <div class="field">
             <label class="label">Employer / Business name</label>
@@ -222,11 +250,26 @@ const selectAccount = (type) => {
         <div class="grid g3 mt">
           <div class="field">
             <label class="label">Monthly income range<span class="req">*</span></label>
-            <select v-model="form.income_range" required><option value="">Select</option><option>Under $200</option><option>$200 – $500</option><option>$500 – $1,000</option><option>$1,000 – $3,000</option><option>Above $3,000</option></select>
+            <select v-model="form.income_range" required><option value=""></option><option>Under $200</option><option>$200 – $500</option><option>$500 – $1,000</option><option>$1,000 – $3,000</option><option>Above $3,000</option></select>
           </div>
           <div class="field">
             <label class="label">Source of funds<span class="req">*</span></label>
-            <select v-model="form.funds_source" required><option value="">Select</option><option>Salary</option><option>Business income</option><option>Remittance</option><option>Savings</option><option>Investment</option><option>Other</option></select>
+            <select v-model="form.funds_source" required>
+              <option value=""></option>
+              <option>Salary / Wages</option>
+              <option>Business Income</option>
+              <option>Trade / Commerce</option>
+              <option>Livestock / Agriculture</option>
+              <option>Remittance (Family Abroad)</option>
+              <option>Rental Income</option>
+              <option>Investment Returns</option>
+              <option>Pension / Retirement</option>
+              <option>Savings</option>
+              <option>Inheritance / Gift</option>
+              <option>Government Benefits</option>
+              <option>NGO / Grant</option>
+              <option>Other</option>
+            </select>
           </div>
           <div class="field">
             <label class="label">Expected monthly transactions</label>
@@ -265,7 +308,7 @@ const selectAccount = (type) => {
         <div class="grid g2">
           <div class="field">
             <label class="label">Home branch<span class="req">*</span></label>
-            <select v-model="form.home_branch" required><option value="">Select branch</option><option>Mogadishu — Main Branch</option><option>Garoowe — Nugaal Branch</option><option>Bosaso — Bari Branch</option></select>
+            <select v-model="form.home_branch" required><option value=""></option><option>Mogadishu — Main Branch</option><option>Garoowe — Nugaal Branch</option><option>Bosaso — Bari Branch</option></select>
           </div>
           <div class="field">
             <label class="label">Initial deposit amount</label>
@@ -321,7 +364,7 @@ const selectAccount = (type) => {
           </div>
           <div class="field">
             <label class="label">Relationship<span class="req">*</span></label>
-            <select v-model="form.kin_relation" required><option value="">Select</option><option>Spouse</option><option>Parent</option><option>Sibling</option><option>Child</option><option>Other</option></select>
+            <select v-model="form.kin_relation" required><option value=""></option><option>Spouse</option><option>Parent</option><option>Sibling</option><option>Child</option><option>Other</option></select>
           </div>
           <div class="field">
             <label class="label">Phone number<span class="req">*</span></label>
@@ -352,6 +395,18 @@ const selectAccount = (type) => {
         </div>
       </div>
     </form>
+
+    <!-- Already have an account -->
+    <div style="text-align:center;padding:20px 0 32px;border-top:0.5px solid rgba(255,255,255,0.07);margin-top:8px">
+      <p style="font-size:13px;color:#6B7E8E;margin-bottom:10px">Already registered? Access your account below.</p>
+      <Link
+        :href="route('customer.login')"
+        style="display:inline-flex;align-items:center;gap:8px;padding:10px 24px;border-radius:10px;background:#C9A84C;color:#0B1929;font-size:13px;font-weight:700;text-decoration:none;transition:background .2s"
+      >
+        <i class="ti ti-login" style="font-size:15px"></i>
+        Login to Customer Portal
+      </Link>
+    </div>
   </div>
 </template>
 

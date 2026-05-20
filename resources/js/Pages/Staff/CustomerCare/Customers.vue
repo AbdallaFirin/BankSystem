@@ -13,19 +13,22 @@ const canWrite = () => {
 
 const props = defineProps({
     customers: Object,
-    filters: Object,
+    filters:   Object,
+    branches:  { type: Array, default: () => [] },
 });
 
 const search     = ref(props.filters?.search ?? '');
 const kycStatus  = ref(props.filters?.kyc_status ?? '');
+const branchId   = ref(props.filters?.branch_id ?? '');
 
 let debounce;
-watch([search, kycStatus], () => {
+watch([search, kycStatus, branchId], () => {
     clearTimeout(debounce);
     debounce = setTimeout(() => {
         router.get(route('staff.customer-care.customers'), {
             search:     search.value,
             kyc_status: kycStatus.value,
+            branch_id:  branchId.value,
         }, { preserveState: true, replace: true });
     }, 400);
 });
@@ -72,6 +75,10 @@ const kycBadge = (status) => {
           <option value="under_review">Under Review</option>
           <option value="verified">Verified</option>
           <option value="rejected">Rejected</option>
+        </select>
+        <select v-model="branchId" class="select-arrow px-4 py-2.5 text-sm text-[#F0EBE1] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded-lg outline-none focus:border-[#C9A84C] transition appearance-none min-w-[190px]">
+          <option value="">All Branches</option>
+          <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.branch_name }}</option>
         </select>
       </div>
 

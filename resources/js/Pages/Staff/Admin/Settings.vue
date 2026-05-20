@@ -20,6 +20,7 @@ const addTypeForm = useForm({
     min_balance: '',
     withdrawal_limit: '',
     overdraft_allowed: false,
+    overdraft_limit: '',
 });
 
 const editTypeForm = useForm({
@@ -28,16 +29,18 @@ const editTypeForm = useForm({
     min_balance: '',
     withdrawal_limit: '',
     overdraft_allowed: false,
+    overdraft_limit: '',
 });
 
 const openEditType = (type) => {
-    editTypeTarget.value        = type;
-    editTypeForm.type_name        = type.type_name;
-    editTypeForm.interest_rate    = type.interest_rate;
-    editTypeForm.min_balance      = type.min_balance;
-    editTypeForm.withdrawal_limit = type.withdrawal_limit || '';
+    editTypeTarget.value           = type;
+    editTypeForm.type_name         = type.type_name;
+    editTypeForm.interest_rate     = type.interest_rate;
+    editTypeForm.min_balance       = type.min_balance;
+    editTypeForm.withdrawal_limit  = type.withdrawal_limit || '';
     editTypeForm.overdraft_allowed = type.overdraft_allowed;
-    showEditTypeModal.value       = true;
+    editTypeForm.overdraft_limit   = type.overdraft_limit || '';
+    showEditTypeModal.value        = true;
 };
 
 const submitAddType = () => {
@@ -115,7 +118,9 @@ const submitEditLimit = () => {
                                 <tr v-for="type in accountTypes" :key="type.id" class="hover:bg-white/[0.01]">
                                     <td class="px-6 py-5">
                                         <p class="text-sm font-medium text-[#F0EBE1]">{{ type.type_name }}</p>
-                                        <p v-if="type.overdraft_allowed" class="text-[10px] text-[#4CAF7D] uppercase font-bold mt-1">Overdraft Enabled</p>
+                                        <p v-if="type.overdraft_allowed" class="text-[10px] text-emerald-400 uppercase font-bold mt-1">
+                                            Overdraft Enabled<span v-if="type.overdraft_limit"> · Max ${{ Number(type.overdraft_limit).toLocaleString() }}</span><span v-else> · Unlimited</span>
+                                        </p>
                                     </td>
                                     <td class="px-6 py-5 text-sm font-mono text-[#F0EBE1]">{{ type.interest_rate }}%</td>
                                     <td class="px-6 py-5 text-sm text-[#A9B8C6] font-mono">${{ Number(type.min_balance).toLocaleString() }}</td>
@@ -200,6 +205,11 @@ const submitEditLimit = () => {
                             <input type="checkbox" v-model="addTypeForm.overdraft_allowed" class="w-4 h-4 accent-[#C9A84C]" />
                             <span class="text-sm text-[#A9B8C6]">Overdraft Allowed</span>
                         </label>
+                        <div v-if="addTypeForm.overdraft_allowed" class="flex flex-col gap-2">
+                            <label class="text-[11px] text-emerald-400 font-bold uppercase tracking-widest">Max Overdraft Amount ($) <span class="text-[#6B7E8E] normal-case">(leave blank for unlimited)</span></label>
+                            <input v-model="addTypeForm.overdraft_limit" type="number" step="0.01" min="0" placeholder="e.g. 500.00"
+                                   class="bg-white/5 border border-emerald-600/30 rounded-xl p-4 text-[#F0EBE1] focus:border-emerald-400 outline-none transition" />
+                        </div>
                         <button type="submit" :disabled="addTypeForm.processing" class="w-full bg-[#C9A84C] text-[#0B1929] font-bold py-4 rounded-xl hover:bg-[#E5C97E] transition disabled:opacity-50">
                             Add Product
                         </button>
@@ -237,6 +247,11 @@ const submitEditLimit = () => {
                             <input type="checkbox" v-model="editTypeForm.overdraft_allowed" class="w-4 h-4 accent-[#C9A84C]" />
                             <span class="text-sm text-[#A9B8C6]">Overdraft Allowed</span>
                         </label>
+                        <div v-if="editTypeForm.overdraft_allowed" class="flex flex-col gap-2">
+                            <label class="text-[11px] text-emerald-400 font-bold uppercase tracking-widest">Max Overdraft Amount ($) <span class="text-[#6B7E8E] normal-case">(leave blank for unlimited)</span></label>
+                            <input v-model="editTypeForm.overdraft_limit" type="number" step="0.01" min="0" placeholder="e.g. 500.00"
+                                   class="bg-white/5 border border-emerald-600/30 rounded-xl p-4 text-[#F0EBE1] focus:border-emerald-400 outline-none transition" />
+                        </div>
                         <button type="submit" :disabled="editTypeForm.processing" class="w-full bg-[#C9A84C] text-[#0B1929] font-bold py-4 rounded-xl hover:bg-[#E5C97E] transition disabled:opacity-50">
                             Save Changes
                         </button>

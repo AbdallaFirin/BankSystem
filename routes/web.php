@@ -43,6 +43,17 @@ Route::get('/login', [AuthController::class, 'showStaffLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'staffLogin']);
 Route::post('/logout', [AuthController::class, 'staffLogout'])->name('logout');
 
+// Staff 2FA
+Route::get('/verify-2fa',  [AuthController::class, 'showVerify2fa'])->name('staff.verify-2fa');
+Route::post('/verify-2fa', [AuthController::class, 'verify2fa'])->name('staff.verify-2fa.post');
+Route::post('/resend-2fa', [AuthController::class, 'resend2fa'])->name('staff.resend-2fa');
+
+// Staff Forgot / Reset Password
+Route::get('/forgot-password',  [AuthController::class, 'showForgotPassword'])->name('staff.forgot-password');
+Route::post('/forgot-password', [AuthController::class, 'sendResetOtp'])->name('staff.forgot-password.send');
+Route::get('/reset-password',   [AuthController::class, 'showResetPassword'])->name('staff.reset-password');
+Route::post('/reset-password',  [AuthController::class, 'resetPassword'])->name('staff.reset-password.confirm');
+
 Route::get('/error/403', function () {
     return \Inertia\Inertia::render('Errors/403');
 })->name('error.403');
@@ -249,6 +260,7 @@ Route::middleware(['auth:staff'])->group(function () {
     Route::get('/staff/teller/deposit',  [\App\Http\Controllers\TellerController::class, 'depositPage'])->name('staff.teller.deposit');
     Route::get('/staff/teller/withdraw', [\App\Http\Controllers\TellerController::class, 'withdrawPage'])->name('staff.teller.withdraw');
     Route::get('/staff/teller/transfer', [\App\Http\Controllers\TellerController::class, 'transferPage'])->name('staff.teller.transfer');
+    Route::get('/staff/teller/history',  [\App\Http\Controllers\TellerController::class, 'historyPage'])->name('staff.teller.history');
     Route::get('/staff/teller/lookup-account', [\App\Http\Controllers\TellerController::class, 'lookupAccount'])->name('staff.teller.lookup');
     Route::post('/staff/teller/reverse/{id}',  [\App\Http\Controllers\TellerController::class, 'reverseTransaction'])->name('staff.teller.reverse');
     Route::post('/staff/teller/cancel/{id}',   [\App\Http\Controllers\TellerController::class, 'cancelPending'])->name('staff.teller.cancel');
@@ -284,6 +296,8 @@ Route::middleware(['auth:staff'])->group(function () {
     Route::post('/staff/customer-care/register', [\App\Http\Controllers\CustomerCareController::class, 'store'])->name('staff.customer-care.store');
     Route::get('/staff/customer-care/customers', [\App\Http\Controllers\CustomerCareController::class, 'customersIndex'])->name('staff.customer-care.customers');
     Route::get('/staff/customer-care/customers/{id}', [\App\Http\Controllers\CustomerCareController::class, 'showProfile'])->name('staff.customer-care.profile');
+    Route::put('/staff/customer-care/customers/{id}', [\App\Http\Controllers\CustomerCareController::class, 'updateCustomer'])->name('staff.customer-care.customers.update');
+    Route::post('/staff/customer-care/customers/{id}/send-portal-access', [\App\Http\Controllers\CustomerCareController::class, 'sendPortalAccess'])->name('staff.customer-care.portal-access');
     Route::get('/staff/customer-care/kyc-pending', [\App\Http\Controllers\CustomerCareController::class, 'kycIndex'])->name('staff.customer-care.kyc.list');
     Route::get('/staff/customer-care/accounts', [\App\Http\Controllers\CustomerCareController::class, 'accountsIndex'])->name('staff.customer-care.accounts.index');
     Route::get('/staff/account/{id}/transactions', [\App\Http\Controllers\CustomerCareController::class, 'accountTransactions'])->name('staff.account.transactions');
@@ -307,14 +321,33 @@ Route::middleware(['auth:staff'])->group(function () {
     Route::get('/staff/transactions/{id}/receipt',             [\App\Http\Controllers\CustomerCareController::class, 'generateReceipt'])->name('staff.transaction.receipt');
 
     // Compliance Operations
-    Route::get('/staff/compliance', [\App\Http\Controllers\ComplianceController::class, 'index'])->name('staff.compliance.index');
-    Route::post('/staff/compliance/kyc/{id}/approve', [\App\Http\Controllers\ComplianceController::class, 'approveKyc'])->name('staff.compliance.approve-kyc');
-    Route::post('/staff/compliance/kyc/{id}/reject', [\App\Http\Controllers\ComplianceController::class, 'rejectKyc'])->name('staff.compliance.reject-kyc');
+    Route::middleware('permission:compliance.check')->group(function () {
+        Route::get( '/staff/compliance/dashboard',                      [\App\Http\Controllers\ComplianceController::class, 'dashboard']        )->name('staff.compliance.dashboard');
+        Route::get( '/staff/compliance',                                [\App\Http\Controllers\ComplianceController::class, 'index']            )->name('staff.compliance.index');
+        Route::post('/staff/compliance/kyc/{id}/approve',               [\App\Http\Controllers\ComplianceController::class, 'approveKyc']       )->name('staff.compliance.approve-kyc');
+        Route::post('/staff/compliance/kyc/{id}/reject',                [\App\Http\Controllers\ComplianceController::class, 'rejectKyc']        )->name('staff.compliance.reject-kyc');
+        Route::get( '/staff/compliance/customers',                      [\App\Http\Controllers\ComplianceController::class, 'customers']         )->name('staff.compliance.customers');
+        Route::get( '/staff/compliance/customers/{id}',                 [\App\Http\Controllers\ComplianceController::class, 'customerDetail']    )->name('staff.compliance.customer-detail');
+    });
+    Route::middleware('permission:aml.flag')->group(function () {
+        Route::get( '/staff/compliance/transactions',                   [\App\Http\Controllers\ComplianceController::class, 'transactions']      )->name('staff.compliance.transactions');
+        Route::post('/staff/compliance/transactions/{id}/flag',         [\App\Http\Controllers\ComplianceController::class, 'flagTransaction']   )->name('staff.compliance.flag');
+        Route::post('/staff/compliance/transactions/{id}/unflag',       [\App\Http\Controllers\ComplianceController::class, 'unflagTransaction'] )->name('staff.compliance.unflag');
+    });
+    Route::middleware('permission:compliance.report')->group(function () {
+        Route::get( '/staff/compliance/reports',                        [\App\Http\Controllers\ComplianceController::class, 'sarIndex']          )->name('staff.compliance.reports');
+        Route::post('/staff/compliance/reports',                        [\App\Http\Controllers\ComplianceController::class, 'sarStore']          )->name('staff.compliance.reports.store');
+        Route::put( '/staff/compliance/reports/{id}',                   [\App\Http\Controllers\ComplianceController::class, 'sarUpdate']         )->name('staff.compliance.reports.update');
+    });
+
+    // Branch Manager — Dashboard
+    Route::get('/staff/branch/dashboard', [\App\Http\Controllers\BranchManagerController::class, 'dashboard'])->name('staff.branch.dashboard');
 
     // Branch Manager Settings
-    Route::get( '/staff/branch/settings',       [\App\Http\Controllers\BranchSettingsController::class, 'index']       )->name('staff.branch.settings');
-    Route::post('/staff/branch/settings',       [\App\Http\Controllers\BranchSettingsController::class, 'update']      )->name('staff.branch.settings.update');
-    Route::post('/staff/branch/vault/deposit',  [\App\Http\Controllers\BranchSettingsController::class, 'vaultDeposit'])->name('staff.branch.vault.deposit');
+    Route::get( '/staff/branch/settings',                      [\App\Http\Controllers\BranchSettingsController::class, 'index']           )->name('staff.branch.settings');
+    Route::post('/staff/branch/settings',                      [\App\Http\Controllers\BranchSettingsController::class, 'update']          )->name('staff.branch.settings.update');
+    Route::post('/staff/branch/vault/deposit',                 [\App\Http\Controllers\BranchSettingsController::class, 'vaultDeposit']    )->name('staff.branch.vault.deposit');
+    Route::put( '/staff/branch/settings/roles/{id}/limit',     [\App\Http\Controllers\BranchSettingsController::class, 'updateRoleLimit'] )->name('staff.branch.settings.role-limit');
 
     // Branch Manager — Staff & Audit
     Route::get(   '/staff/branch/staff',             [\App\Http\Controllers\BranchManagerController::class, 'staffIndex']  )->name('staff.branch.staff.index');
@@ -325,6 +358,13 @@ Route::middleware(['auth:staff'])->group(function () {
     Route::delete('/staff/branch/staff/{id}',        [\App\Http\Controllers\BranchManagerController::class, 'staffDestroy'])->name('staff.branch.staff.destroy');
     Route::get(   '/staff/branch/audit',             [\App\Http\Controllers\BranchManagerController::class, 'auditIndex']  )->name('staff.branch.audit');
 
+    // Branch Manager — Inter-Branch Clearing
+    Route::get( '/staff/branch/clearing',             [\App\Http\Controllers\InterBranchClearingController::class, 'index'] )->name('staff.branch.clearing.index');
+    Route::post('/staff/branch/clearing/{id}/settle', [\App\Http\Controllers\InterBranchClearingController::class, 'settle'])->name('staff.branch.clearing.settle');
+
+    // Branch Manager / Admin — Reports
+    Route::get('/staff/branch/reports', [\App\Http\Controllers\ReportsController::class, 'branchReport'])->name('staff.branch.reports');
+
     // My Profile (all staff)
     Route::get( '/staff/my-profile',          [\App\Http\Controllers\StaffProfileController::class, 'show']           )->name('staff.profile');
     Route::post('/staff/my-profile/info',     [\App\Http\Controllers\StaffProfileController::class, 'updateInfo']     )->name('staff.profile.info');
@@ -332,8 +372,9 @@ Route::middleware(['auth:staff'])->group(function () {
     Route::post('/staff/my-profile/avatar',   [\App\Http\Controllers\StaffProfileController::class, 'updateAvatar']   )->name('staff.profile.avatar');
 
     // Accounting Operations
-    Route::get('/staff/accounting/ledger', [\App\Http\Controllers\AccountingController::class, 'ledger'])->name('staff.accounting.ledger');
+    Route::get('/staff/accounting/ledger',        [\App\Http\Controllers\AccountingController::class, 'ledger'])->name('staff.accounting.ledger');
     Route::get('/staff/accounting/trial-balance', [\App\Http\Controllers\AccountingController::class, 'trialBalance'])->name('staff.accounting.trial-balance');
+    Route::get('/staff/accounting/gl/{id}',       [\App\Http\Controllers\AccountingController::class, 'glDetail'])->name('staff.accounting.gl-detail');
 
     // HQ / Super Admin Operations
     Route::get('/staff/admin/dashboard', [\App\Http\Controllers\AdminController::class, 'dashboard'])->name('staff.admin.dashboard');
@@ -353,7 +394,9 @@ Route::middleware(['auth:staff'])->group(function () {
     // Staff Management
     Route::get('/staff/admin/staff', [\App\Http\Controllers\AdminController::class, 'staffIndex'])->name('staff.admin.staff.index');
     Route::post('/staff/admin/staff', [\App\Http\Controllers\AdminController::class, 'storeStaff'])->name('staff.admin.staff.store');
+    Route::put('/staff/admin/staff/{id}', [\App\Http\Controllers\AdminController::class, 'updateStaff'])->name('staff.admin.staff.update');
     Route::post('/staff/admin/staff/{id}/status', [\App\Http\Controllers\AdminController::class, 'updateStaffStatus'])->name('staff.admin.staff.status');
+    Route::post('/staff/admin/staff/{id}/reset-password', [\App\Http\Controllers\AdminController::class, 'resetStaffPassword'])->name('staff.admin.staff.reset-password');
     Route::get('/staff/admin/staff/preview-id', [\App\Http\Controllers\AdminController::class, 'previewStaffId'])->name('staff.admin.staff.preview-id');
 
     // Audit Log
@@ -368,4 +411,58 @@ Route::middleware(['auth:staff'])->group(function () {
     // Customer Status Control
     Route::get('/staff/admin/customers', [\App\Http\Controllers\AdminController::class, 'customerIndex'])->name('staff.admin.customers.index');
     Route::post('/staff/admin/customers/{id}/status', [\App\Http\Controllers\AdminController::class, 'updateCustomerStatus'])->name('staff.admin.customers.status');
+
+    // Customer Portal Access Management
+    Route::get('/staff/admin/portal-access',            [\App\Http\Controllers\AdminController::class, 'portalAccessIndex'])->name('staff.admin.portal-access.index');
+    Route::post('/staff/admin/portal-access/bulk-send', [\App\Http\Controllers\AdminController::class, 'bulkSendPortalAccess'])->name('staff.admin.portal-access.bulk-send');
+
 });
+
+/* ══════════════════════════════════════════════════════════
+ *  CUSTOMER SELF-SERVICE PORTAL
+ * ══════════════════════════════════════════════════════════ */
+
+// Guest routes (not logged in)
+Route::middleware('guest:customers')->group(function () {
+    Route::get('/customer/login',  [\App\Http\Controllers\CustomerAuthController::class, 'showLogin'])->name('customer.login');
+    Route::post('/customer/login', [\App\Http\Controllers\CustomerAuthController::class, 'login'])->name('customer.login.post');
+
+    // Customer Forgot / Reset Password
+    Route::get('/customer/forgot-password',  [\App\Http\Controllers\CustomerAuthController::class, 'showForgotPassword'])->name('customer.forgot-password');
+    Route::post('/customer/forgot-password', [\App\Http\Controllers\CustomerAuthController::class, 'sendResetOtp'])->name('customer.forgot-password.send');
+    Route::get('/customer/reset-password',   [\App\Http\Controllers\CustomerAuthController::class, 'showResetPassword'])->name('customer.reset-password');
+    Route::post('/customer/reset-password',  [\App\Http\Controllers\CustomerAuthController::class, 'resetPassword'])->name('customer.reset-password.confirm');
+});
+
+// 2FA verification (no auth required — user just validated creds)
+Route::get('/customer/verify-2fa',  [\App\Http\Controllers\CustomerAuthController::class, 'showVerify2fa'])->name('customer.verify-2fa');
+Route::post('/customer/verify-2fa', [\App\Http\Controllers\CustomerAuthController::class, 'verify2fa'])->name('customer.verify-2fa.post');
+Route::post('/customer/resend-otp', [\App\Http\Controllers\CustomerAuthController::class, 'resendOtp'])->name('customer.resend-otp');
+
+// Authenticated customer routes
+Route::middleware(['auth:customers', \App\Http\Middleware\EnsureCustomerAuthenticated::class])
+    ->prefix('customer')
+    ->name('customer.')
+    ->group(function () {
+        Route::post('/logout', [\App\Http\Controllers\CustomerAuthController::class, 'logout'])->name('logout');
+
+        Route::get('/change-password',  [\App\Http\Controllers\CustomerAuthController::class, 'showChangePassword'])->name('change-password');
+        Route::post('/change-password', [\App\Http\Controllers\CustomerAuthController::class, 'changePassword'])->name('change-password.post');
+
+        Route::get('/dashboard',                [\App\Http\Controllers\CustomerPortalController::class, 'dashboard'])->name('dashboard');
+        Route::get('/accounts',                 [\App\Http\Controllers\CustomerPortalController::class, 'accounts'])->name('accounts');
+        Route::get('/transactions',             [\App\Http\Controllers\CustomerPortalController::class, 'transactions'])->name('transactions');
+        Route::get('/notifications',            [\App\Http\Controllers\CustomerPortalController::class, 'notifications'])->name('notifications');
+        Route::post('/notifications/read',      [\App\Http\Controllers\CustomerPortalController::class, 'markNotificationsRead'])->name('notifications.read');
+        Route::get('/profile',                  [\App\Http\Controllers\CustomerPortalController::class, 'profile'])->name('profile');
+        Route::get('/reports',                  [\App\Http\Controllers\CustomerPortalController::class, 'reports'])->name('reports');
+        Route::get('/reports/export',           [\App\Http\Controllers\CustomerPortalController::class, 'exportCsv'])->name('reports.export');
+        Route::get('/transactions/{id}/receipt',[\App\Http\Controllers\CustomerPortalController::class, 'receipt'])->name('transactions.receipt');
+        Route::get('/transfer',                 [\App\Http\Controllers\CustomerTransferController::class, 'show'])->name('transfer');
+        Route::post('/transfer',                [\App\Http\Controllers\CustomerTransferController::class, 'submit'])->name('transfer.post');
+        Route::get('/transfer/lookup',          [\App\Http\Controllers\CustomerTransferController::class, 'lookup'])->name('transfer.lookup');
+        Route::get('/deposit',                  [\App\Http\Controllers\CustomerBankingController::class, 'showDeposit'])->name('deposit');
+        Route::post('/deposit',                 [\App\Http\Controllers\CustomerBankingController::class, 'submitDeposit'])->name('deposit.post');
+        Route::get('/withdraw',                 [\App\Http\Controllers\CustomerBankingController::class, 'showWithdraw'])->name('withdraw');
+        Route::post('/withdraw',                [\App\Http\Controllers\CustomerBankingController::class, 'submitWithdraw'])->name('withdraw.post');
+    });

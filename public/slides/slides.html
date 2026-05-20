@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="so">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Bank Management System – TikTok Slides</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700;800;900&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#050505;font-family:'Space Grotesk',sans-serif;display:flex;flex-direction:column;align-items:center;gap:48px;padding:48px 20px 100px}
+
+/* ── slide shell ── */
+.slide{
+  width:1080px;height:1920px;border-radius:28px;position:relative;overflow:hidden;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:90px 80px;text-align:center;
+  box-shadow:0 50px 140px rgba(0,0,0,.8);
+}
+
+/* ── decorative orb ── */
+.orb{position:absolute;border-radius:50%;filter:blur(90px);opacity:.38;pointer-events:none}
+
+/* ── slide number chip ── */
+.chip{
+  position:absolute;top:58px;left:50%;transform:translateX(-50%);
+  background:rgba(255,255,255,.12);backdrop-filter:blur(14px);
+  border:1.5px solid rgba(255,255,255,.22);
+  padding:10px 30px;border-radius:999px;
+  font-size:21px;font-weight:800;color:rgba(255,255,255,.85);
+  letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;
+}
+
+/* ── browser mockup ── */
+.browser{
+  width:100%;border-radius:18px;overflow:hidden;
+  box-shadow:0 24px 80px rgba(0,0,0,.7);
+  border:2px solid rgba(255,255,255,.12);
+  flex-shrink:0;
+}
+.browser-bar{
+  background:#1C2333;padding:10px 18px;display:flex;align-items:center;gap:10px;
+}
+.browser-bar .dots{display:flex;gap:7px}
+.browser-bar .dot{width:13px;height:13px;border-radius:50%}
+.dot-r{background:#FF5F57}.dot-y{background:#FEBC2E}.dot-g{background:#28C840}
+.browser-bar .url{
+  flex:1;background:rgba(255,255,255,.07);border-radius:6px;
+  padding:5px 14px;font-size:13px;color:rgba(255,255,255,.4);text-align:left;
+  font-family:monospace;margin-left:10px;
+}
+.browser img{width:100%;display:block}
+
+/* ── typography ── */
+.slide h1{font-size:100px;font-weight:900;line-height:1.06;color:#fff;letter-spacing:-.02em;text-shadow:0 4px 40px rgba(0,0,0,.4)}
+.slide h2{font-size:70px;font-weight:800;line-height:1.1;color:#fff;letter-spacing:-.015em}
+.slide p{font-size:48px;font-weight:500;line-height:1.5;color:rgba(255,255,255,.85)}
+.slide .divider{width:110px;height:6px;border-radius:3px;background:rgba(255,255,255,.45);margin:36px auto}
+.accent{font-weight:900}
+.pill{
+  display:flex;align-items:flex-start;gap:20px;
+  background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.2);
+  border-radius:20px;padding:22px 32px;margin:14px 0;text-align:left;width:100%;
+  backdrop-filter:blur(8px);
+}
+.pill-ico{font-size:52px;line-height:1;flex-shrink:0}
+.pill-text strong{display:block;font-size:40px;font-weight:800;color:#fff;margin-bottom:6px}
+.pill-text span{font-size:30px;color:rgba(255,255,255,.65);font-weight:500}
+
+/* ── tech badges ── */
+.tech{display:flex;flex-direction:column;gap:20px;width:100%;margin-top:16px}
+.tech-badge{
+  display:flex;align-items:center;gap:22px;
+  border-radius:18px;padding:22px 36px;font-size:50px;font-weight:800;color:#fff;
+}
+
+/* ── feature grid ── */
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px;width:100%;margin-top:16px}
+.fcard{background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.15);
+  border-radius:18px;padding:28px 22px;text-align:center}
+.fcard .ico{font-size:54px;margin-bottom:12px}
+.fcard p{font-size:34px;font-weight:800;color:#fff;line-height:1.2}
+
+/* ── follow btn ── */
+.follow-btn{
+  display:inline-flex;align-items:center;gap:18px;
+  background:#FF0050;border-radius:999px;
+  padding:32px 80px;font-size:56px;font-weight:900;color:#fff;margin-top:30px;
+  box-shadow:0 0 80px rgba(255,0,80,.55);
+}
+.gh-btn{
+  display:inline-flex;align-items:center;gap:18px;
+  background:rgba(255,255,255,.12);border:2.5px solid rgba(255,255,255,.3);
+  border-radius:999px;padding:28px 64px;font-size:44px;font-weight:800;color:#fff;
+  backdrop-filter:blur(10px);margin-top:22px;
+}
+
+/* ═══════ THEMES ═══════ */
+#s1{background:linear-gradient(145deg,#0F0C29 0%,#302B63 55%,#24243E 100%)}
+#s1 .o1{width:700px;height:700px;background:#7B2FBE;top:-160px;right:-160px}
+#s1 .o2{width:500px;height:500px;background:#3B1F8C;bottom:-100px;left:-100px}
+
+#s2{background:linear-gradient(145deg,#071520 0%,#0A3D2E 55%,#052510 100%)}
+#s2 .o1{width:650px;height:650px;background:#00B08A;top:-180px;left:-120px}
+#s2 .o2{width:400px;height:400px;background:#006655;bottom:-80px;right:-80px}
+
+#s3{background:linear-gradient(145deg,#000428 0%,#004e92 100%)}
+#s3 .o1{width:680px;height:680px;background:#0066CC;top:-130px;right:-130px}
+#s3 .o2{width:380px;height:380px;background:#00A8E8;bottom:-60px;left:-60px}
+
+#s4{background:linear-gradient(145deg,#160A00 0%,#3D1F00 50%,#160A00 100%)}
+#s4 .o1{width:700px;height:700px;background:#C47A00;top:-140px;left:50%;transform:translateX(-50%)}
+#s4 .o2{width:420px;height:420px;background:#FF8C00;bottom:-100px;right:-80px}
+
+#s5{background:linear-gradient(145deg,#180018 0%,#3D003D 55%,#1A0020 100%)}
+#s5 .o1{width:700px;height:700px;background:#CC0066;top:-100px;right:-100px}
+#s5 .o2{width:480px;height:480px;background:#880044;bottom:-120px;left:-80px}
+
+#s6{background:linear-gradient(145deg,#050E27 0%,#112447 55%,#1A3D68 100%)}
+#s6 .o1{width:600px;height:600px;background:#1B6CA8;top:-100px;left:-100px}
+#s6 .o2{width:480px;height:480px;background:#E43F5A;bottom:-100px;right:-100px}
+
+#s7{background:linear-gradient(145deg,#000000 0%,#0D0D0D 55%,#001A0D 100%)}
+#s7 .o1{width:700px;height:700px;background:#00CC66;top:-150px;left:50%;transform:translateX(-50%);opacity:.25}
+#s7 .o2{width:420px;height:420px;background:#FF0050;bottom:-80px;right:-60px}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ SLIDE 1 ═══════════ -->
+<div class="slide" id="s1">
+  <div class="orb o1"></div><div class="orb o2"></div>
+  <div class="chip">Slide 01</div>
+
+  <div style="font-size:130px;margin-bottom:24px">👋</div>
+  <h1>Maalmahan<br/>Waa kala<br/>Maqnayn!</h1>
+  <div class="divider"></div>
+  <p><span class="accent" style="color:#B39DFF">Laakin</span> aad idinka<br/>daba geeyo waxaan<br/>ku Maqnaa 🚀</p>
+</div>
+
+<!-- ═══════════ SLIDE 2 ═══════════ -->
+<div class="slide" id="s2">
+  <div class="orb o1"></div><div class="orb o2"></div>
+  <div class="chip">Slide 02</div>
+
+  <div style="font-size:90px;margin-bottom:18px">🏦</div>
+  <h2 style="font-size:58px;color:rgba(255,255,255,.75);margin-bottom:12px">Waxaan ku guda jiray dhisidda</h2>
+  <h1 style="font-size:86px;color:#4ECDC4;line-height:1.05">Final Project<br/>Jaamacadda</h1>
+  <div class="divider"></div>
+
+  <!-- HQ Dashboard screenshot -->
+  <div class="browser" style="margin-top:10px">
+    <div class="browser-bar">
+      <div class="dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+      <div class="url">localhost:8000/staff/admin/dashboard</div>
+    </div>
+    <img src="screenshots/dashboard_hq.png" alt="HQ Dashboard"/>
+  </div>
+</div>
+
+<!-- ═══════════ SLIDE 3 ═══════════ -->
+<div class="slide" id="s3">
+  <div class="orb o1"></div><div class="orb o2"></div>
+  <div class="chip">Slide 03</div>
+
+  <h2 style="font-size:60px;margin-bottom:8px">System kaan ku dhisaayey ⚙️</h2>
+  <div class="divider" style="margin:20px auto"></div>
+
+  <div class="tech">
+    <div class="tech-badge" style="background:rgba(255,69,0,.22);border:2px solid rgba(255,100,50,.4)">
+      <span style="font-size:58px">🔴</span> Laravel 12
+    </div>
+    <div class="tech-badge" style="background:rgba(65,184,131,.18);border:2px solid rgba(65,184,131,.4)">
+      <span style="font-size:58px">🟢</span> Vue.js 3
+    </div>
+    <div class="tech-badge" style="background:rgba(56,189,248,.18);border:2px solid rgba(56,189,248,.4)">
+      <span style="font-size:58px">🔵</span> Tailwind CSS
+    </div>
+  </div>
+
+  <!-- Deposit page screenshot -->
+  <div class="browser" style="margin-top:30px">
+    <div class="browser-bar">
+      <div class="dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+      <div class="url">localhost:8000/staff/teller/deposit</div>
+    </div>
+    <img src="screenshots/teller_deposit.png" alt="Cash Deposit"/>
+  </div>
+</div>
+
+<!-- ═══════════ SLIDE 4 ═══════════ -->
+<div class="slide" id="s4">
+  <div class="orb o1"></div><div class="orb o2"></div>
+  <div class="chip">Slide 04</div>
+
+  <div style="font-size:100px;margin-bottom:16px">🌍</div>
+  <h2 style="color:#FFD700;font-size:64px">System-ku waa Mid<br/>Bank kasta Isticmaali karo</h2>
+  <div class="divider"></div>
+  <p style="font-size:46px;margin-bottom:28px">isagoo leh <span class="accent" style="color:#FFD700">features badan</span> oo casri ah 🔥</p>
+
+  <!-- Branch Dashboard screenshot -->
+  <div class="browser">
+    <div class="browser-bar">
+      <div class="dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+      <div class="url">localhost:8000/staff/dashboard</div>
+    </div>
+    <img src="screenshots/dashboard_branch.png" alt="Branch Dashboard"/>
+  </div>
+</div>
+
+<!-- ═══════════ SLIDE 5 ═══════════ -->
+<div class="slide" id="s5">
+  <div class="orb o1"></div><div class="orb o2"></div>
+  <div class="chip">Slide 05</div>
+
+  <h2 style="font-size:62px;color:#FFB3D9;margin-bottom:28px">Features Muhiimka ah 💡</h2>
+
+  <div class="pill">
+    <div class="pill-ico">🏢</div>
+    <div class="pill-text">
+      <strong>Multi Branch Management</strong>
+      <span>Bank xaruma kala duwan • One Database</span>
+    </div>
+  </div>
+  <div class="pill">
+    <div class="pill-ico">👥</div>
+    <div class="pill-text">
+      <strong>Multi Staff Management</strong>
+      <span>Portal u gooniya shaqaala walba • RBAC</span>
+    </div>
+  </div>
+  <div class="pill">
+    <div class="pill-ico">📱</div>
+    <div class="pill-text">
+      <strong>Customer Portal</strong>
+      <span>Maaraynta Dhaqdhaaqaha Bank-ga</span>
+    </div>
+  </div>
+
+  <!-- Customer directory screenshot -->
+  <div class="browser" style="margin-top:24px">
+    <div class="browser-bar">
+      <div class="dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+      <div class="url">localhost:8000/staff/customer-care/customers</div>
+    </div>
+    <img src="screenshots/customers.png" alt="Customer Directory"/>
+  </div>
+</div>
+
+<!-- ═══════════ SLIDE 6 ═══════════ -->
+<div class="slide" id="s6">
+  <div class="orb o1"></div><div class="orb o2"></div>
+  <div class="chip">Slide 06</div>
+
+  <div style="font-size:90px;margin-bottom:14px">📊</div>
+  <h2 style="color:#63B3ED;font-size:60px;margin-bottom:6px">Wax walba oo Bank<br/>u baahan yahay ✅</h2>
+  <div class="divider" style="margin:22px auto"></div>
+
+  <div class="fgrid">
+    <div class="fcard"><div class="ico">💰</div><p>Cash Count</p></div>
+    <div class="fcard"><div class="ico">📒</div><p>General Ledger</p></div>
+    <div class="fcard"><div class="ico">📄</div><p>Report Generation</p></div>
+    <div class="fcard"><div class="ico">🔒</div><p>KYC & Audit Logs</p></div>
+  </div>
+
+  <!-- Transaction History screenshot -->
+  <div class="browser" style="margin-top:26px">
+    <div class="browser-bar">
+      <div class="dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+      <div class="url">localhost:8000/staff/teller/history</div>
+    </div>
+    <img src="screenshots/txn_history.png" alt="Transaction History"/>
+  </div>
+</div>
+
+<!-- ═══════════ SLIDE 7 ═══════════ -->
+<div class="slide" id="s7">
+  <div class="orb o1"></div><div class="orb o2"></div>
+  <div class="chip">Slide 07</div>
+
+  <div style="font-size:110px;margin-bottom:18px">🎓</div>
+  <h1 style="font-size:82px;line-height:1.08;margin-bottom:24px">Markaan kasoo<br/>dhamaado...</h1>
+  <div class="divider"></div>
+  <p style="font-size:46px;margin-bottom:10px;color:rgba(255,255,255,.8)">
+    Waxaan soo Galin doona<br/>
+    <span class="accent" style="color:#FFD700">GitHub Profile</span>-kayga 🚀
+  </p>
+  <div class="gh-btn">🐙 GitHub Profile</div>
+
+  <p style="font-size:42px;font-weight:700;margin-top:44px;color:rgba(255,255,255,.6)">
+    Mahadsanid hadaa halkaa soo gaartay 🙏
+  </p>
+  <div class="follow-btn">➕ Follow Me</div>
+
+  <!-- Accounts screenshot as subtle bottom accent -->
+  <div class="browser" style="margin-top:36px;opacity:.7">
+    <div class="browser-bar">
+      <div class="dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+      <div class="url">localhost:8000/staff/customer-care/accounts</div>
+    </div>
+    <img src="screenshots/accounts.png" alt="Bank Accounts"/>
+  </div>
+</div>
+
+</body>
+</html>

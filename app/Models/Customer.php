@@ -2,11 +2,18 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 
-class Customer extends Model
+class Customer extends Authenticatable
 {
     protected $guarded = [];
+
+    protected $hidden = ['password'];
+
+    protected $casts = [
+        'must_change_password' => 'boolean',
+        'last_login_at'        => 'datetime',
+    ];
 
     public function accounts()
     {
@@ -26,5 +33,17 @@ class Customer extends Model
     public function kycDocuments()
     {
         return $this->hasMany(KycDocument::class);
+    }
+
+    public function notifications()
+    {
+        return $this->hasMany(Notification::class, 'recipient_id')
+                    ->where('recipient_type', 'customer')
+                    ->orderByDesc('created_at');
+    }
+
+    public function unreadNotificationsCount(): int
+    {
+        return $this->notifications()->where('status', 'pending')->count();
     }
 }

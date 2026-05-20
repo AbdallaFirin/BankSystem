@@ -3,19 +3,128 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\Account;
 use App\Models\CashAllocation;
 use App\Models\CashCount;
 use App\Models\LedgerEntry;
+use App\Models\PendingApproval;
 use App\Models\Role;
 use App\Models\Staff;
 use App\Models\StaffAuditLog;
 use App\Models\Transaction;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
 
 class BranchManagerController extends Controller
 {
+    /* ─────────────────────────────────────────────
+     *  GET /staff/branch/dashboard
+     * ───────────────────────────────────────────── */
+    public function dashboard()
+    {
+        $manager  = Auth::guard('staff')->user()->load('branch');
+        $branchId = $manager->branch_id;
+
+        // ── Vault balance ──────────────────────────────────────────────────────
+        $vault        = Account::where('account_number', 'VAULT-' . $branchId)->first();
+        $vaultBalance = $vault
+            ? (float) LedgerEntry::where('account_id', $vault->id)
+                ->selectRaw("SUM(CASE WHEN entry_type='credit' THEN amount ELSE -amount END) as bal")
+                ->value('bal') ?? 0.0
+            : 0.0;
+
+        // ── Today stats ────────────────────────────────────────────────────────
+        $todayBase = Transaction::where('branch_id', $branchId)->whereDate('created_at', today());
+        $todayCount  = (clone $todayBase)->count();
+        $todayAmount = (float)(clone $todayBase)->sum('amount');
+
+        // ── This month stats ───────────────────────────────────────────────────
+        $monthBase   = Transaction::where('branch_id', $branchId)
+                           ->whereMonth('created_at', now()->month)
+                           ->whereYear('created_at', now()->year);
+        $monthCount  = (clone $monthBase)->count();
+        $monthAmount = (float)(clone $monthBase)->sum('amount');
+
+        // ── Pending approvals ──────────────────────────────────────────────────
+        $pendingApprovals = PendingApproval::where('status', 'pending')
+            ->whereHas('transaction', fn($q) => $q->where('branch_id', $branchId))
+            ->count();
+
+        // ── Flagged transactions ───────────────────────────────────────────────
+        $flaggedCount = Transaction::where('branch_id', $branchId)
+            ->where('is_flagged', true)->count();
+
+        // ── Staff counts ───────────────────────────────────────────────────────
+        $staffTotal  = Staff::where('branch_id', $branchId)->count();
+        $staffActive = Staff::where('branch_id', $branchId)->where('status', 'active')->count();
+
+        // ── 7-day trend ────────────────────────────────────────────────────────
+        $trend = collect(range(6, 0))->map(function ($daysAgo) use ($branchId) {
+            $date = now()->subDays($daysAgo)->toDateString();
+            $row  = Transaction::where('branch_id', $branchId)
+                ->whereDate('created_at', $date)
+                ->selectRaw('COUNT(*) as cnt, SUM(amount) as amt')
+                ->first();
+            return [
+                'date'   => now()->subDays($daysAgo)->format('D'),
+                'count'  => (int)($row->cnt ?? 0),
+                'amount' => (float)($row->amt ?? 0),
+            ];
+        });
+
+        // ── Transaction breakdown by type ──────────────────────────────────────
+        $breakdown = Transaction::where('branch_id', $branchId)
+            ->whereMonth('created_at', now()->month)
+            ->whereYear('created_at', now()->year)
+            ->select('type', DB::raw('COUNT(*) as cnt'), DB::raw('SUM(amount) as amt'))
+            ->groupBy('type')
+            ->get()
+            ->keyBy('type')
+            ->map(fn($r) => ['count' => (int)$r->cnt, 'amount' => (float)$r->amt]);
+
+        // ── Top tellers today ──────────────────────────────────────────────────
+        $topTellers = Transaction::where('transactions.branch_id', $branchId)
+            ->whereDate('transactions.created_at', today())
+            ->join('staff', 'transactions.initiated_by', '=', 'staff.id')
+            ->select('staff.full_name', 'staff.ident_number', DB::raw('COUNT(*) as cnt'), DB::raw('SUM(transactions.amount) as amt'))
+            ->groupBy('staff.id', 'staff.full_name', 'staff.ident_number')
+            ->orderByDesc('amt')
+            ->limit(5)
+            ->get();
+
+        // ── Recent flagged transactions ────────────────────────────────────────
+        $recentFlagged = Transaction::with(['primaryAccount.customer'])
+            ->where('branch_id', $branchId)
+            ->where('is_flagged', true)
+            ->latest()->limit(5)->get();
+
+        // ── Recent pending approvals ───────────────────────────────────────────
+        $recentPending = PendingApproval::with(['transaction.primaryAccount.customer', 'requestedBy'])
+            ->where('status', 'pending')
+            ->whereHas('transaction', fn($q) => $q->where('branch_id', $branchId))
+            ->latest()->limit(5)->get();
+
+        return Inertia::render('Staff/BranchManager/Dashboard', [
+            'branch_name'      => $manager->branch?->branch_name ?? '—',
+            'vault_balance'    => $vaultBalance,
+            'today_count'      => $todayCount,
+            'today_amount'     => $todayAmount,
+            'month_count'      => $monthCount,
+            'month_amount'     => $monthAmount,
+            'pending_approvals'=> $pendingApprovals,
+            'flagged_count'    => $flaggedCount,
+            'staff_total'      => $staffTotal,
+            'staff_active'     => $staffActive,
+            'trend'            => $trend->values(),
+            'breakdown'        => $breakdown,
+            'top_tellers'      => $topTellers,
+            'recent_flagged'   => $recentFlagged,
+            'recent_pending'   => $recentPending,
+        ]);
+    }
+
     /* ─────────────────────────────────────────────
      *  Shared: generate staff ID (branch-scoped)
      * ───────────────────────────────────────────── */
@@ -93,15 +202,31 @@ class BranchManagerController extends Controller
     /* ─────────────────────────────────────────────
      *  GET /staff/branch/staff
      * ───────────────────────────────────────────── */
-    public function staffIndex()
+    public function staffIndex(Request $request)
     {
         $manager = Auth::guard('staff')->user();
 
-        $staffList = Staff::with('role')
-            ->where('branch_id', $manager->branch_id)
-            ->orderBy('role_id')
-            ->orderBy('full_name')
-            ->get()
+        $query = Staff::with('role')->where('branch_id', $manager->branch_id);
+
+        if ($request->filled('search')) {
+            $s = $request->search;
+            $query->where(function ($q) use ($s) {
+                $q->where('full_name', 'like', "%{$s}%")
+                  ->orWhere('ident_number', 'like', "%{$s}%")
+                  ->orWhere('email', 'like', "%{$s}%")
+                  ->orWhere('phone', 'like', "%{$s}%");
+            });
+        }
+
+        if ($request->filled('role_id')) {
+            $query->where('role_id', $request->role_id);
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $staffList = $query->orderBy('role_id')->orderBy('full_name')->get()
             ->map(fn($s) => [
                 'id'           => $s->id,
                 'full_name'    => $s->full_name,
@@ -123,6 +248,7 @@ class BranchManagerController extends Controller
         return Inertia::render('Staff/BranchManager/BranchStaff', [
             'staff_list' => $staffList,
             'roles'      => $roles,
+            'filters'    => $request->only('search', 'role_id', 'status'),
         ]);
     }
 

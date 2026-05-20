@@ -1,11 +1,29 @@
 <script setup>
-import { ref } from 'vue'
-import { Head, Link, usePage } from '@inertiajs/vue3';
+import { ref, watch } from 'vue'
+import { Head, Link, usePage, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 
 const props = defineProps({
     accounts: Object, // Paginated
+    branches: { type: Array, default: () => [] },
+    filters:  { type: Object, default: () => ({}) },
 });
+
+const search   = ref(props.filters?.search ?? '')
+const branchId = ref(props.filters?.branch_id ?? '')
+const status   = ref(props.filters?.status ?? '')
+
+let debounce
+watch([search, branchId, status], () => {
+    clearTimeout(debounce)
+    debounce = setTimeout(() => {
+        router.get(route('staff.customer-care.accounts.index'), {
+            search:    search.value,
+            branch_id: branchId.value,
+            status:    status.value,
+        }, { preserveState: true, replace: true })
+    }, 400)
+})
 
 const page = usePage();
 
@@ -114,6 +132,28 @@ function downloadStatement() {
 
         <div class="p-6 md:p-8 max-w-7xl mx-auto">
 
+            <!-- Filters -->
+            <div class="flex flex-col md:flex-row gap-3 mb-6">
+                <div class="relative flex-1">
+                    <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7E8E]"></i>
+                    <input v-model="search" type="text" placeholder="Search account number, customer name or phone…"
+                           class="w-full pl-9 pr-4 py-2.5 text-sm text-[#F0EBE1] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded-lg outline-none focus:border-[#C9A84C] transition" />
+                </div>
+                <select v-model="branchId"
+                        class="select-arrow px-4 py-2.5 text-sm text-[#F0EBE1] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded-lg outline-none focus:border-[#C9A84C] transition appearance-none min-w-[190px]">
+                    <option value="">All Branches</option>
+                    <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.branch_name }}</option>
+                </select>
+                <select v-model="status"
+                        class="select-arrow px-4 py-2.5 text-sm text-[#F0EBE1] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded-lg outline-none focus:border-[#C9A84C] transition appearance-none min-w-[150px]">
+                    <option value="">All Statuses</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="dormant">Dormant</option>
+                    <option value="frozen">Frozen</option>
+                </select>
+            </div>
+
             <!-- Table -->
             <div class="bg-[#112236] border border-[#ffffff14] rounded-2xl overflow-hidden shadow-xl">
                 <div class="overflow-x-auto">
@@ -160,7 +200,7 @@ function downloadStatement() {
 
                                 <!-- Branch -->
                                 <td class="px-5 py-4 text-sm text-[#A9B8C6] hidden lg:table-cell">
-                                    {{ account.home_branch?.branch_name ?? '—' }}
+                                    {{ account.home_branch?.branch_name ?? account.home_branch?.name ?? '—' }}
                                 </td>
 
                                 <!-- Balance -->
@@ -329,4 +369,10 @@ function downloadStatement() {
 <style scoped>
 .modal-enter-active, .modal-leave-active { transition: opacity .2s, transform .2s; }
 .modal-enter-from, .modal-leave-to { opacity: 0; transform: scale(.95); }
+.select-arrow {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7E8E' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+}
+select option { background: #112236; color: #F0EBE1; }
 </style>

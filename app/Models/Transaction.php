@@ -24,4 +24,14 @@ class Transaction extends Model
     {
         return $this->belongsTo(Account::class, 'to_account_id');
     }
+
+    public function flaggedBy()
+    {
+        return $this->belongsTo(Staff::class, 'flagged_by');
+    }
+
+    public function ledgerEntries()
+    {
+        return $this->hasMany(LedgerEntry::class);
+    }
 }

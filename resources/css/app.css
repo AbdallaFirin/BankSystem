@@ -1,3 +1,72 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ═══════════════════════════════════════════════════════════════
+   GOBAAD BANK — LIGHT MODE THEME OVERRIDES
+   Applied when <html class="light-mode"> is set.
+   Sidebars (inside <aside>) always stay dark (brand identity).
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Backgrounds ──────────────────────────────────────────────── */
+html.light-mode .bg-\[\#0B1929\]:not(aside):not(aside *) { background-color: #f1f5f9 !important; }
+html.light-mode .bg-\[\#112236\]:not(aside):not(aside *) { background-color: #ffffff !important; }
+html.light-mode .bg-\[\#162B40\]:not(aside):not(aside *) { background-color: #f8fafc !important; }
+html.light-mode .bg-\[\#0d1f30\]:not(aside):not(aside *) { background-color: #f1f5f9 !important; }
+html.light-mode .bg-\[\#0d1d30\]:not(aside):not(aside *) { background-color: #f1f5f9 !important; }
+html.light-mode .bg-\[\#0f2235\]:not(aside):not(aside *) { background-color: #f8fafc !important; }
+html.light-mode .bg-\[\#0e1e2e\]:not(aside):not(aside *) { background-color: #f8fafc !important; }
+html.light-mode .bg-\[\#1a3050\]:not(aside):not(aside *) { background-color: #f0f4f8 !important; }
+html.light-mode .bg-\[\#1a3a5c\]:not(aside):not(aside *) { background-color: #1e40af !important; }
+html.light-mode .bg-\[\#132030\]:not(aside):not(aside *) { background-color: #f8fafc !important; }
+html.light-mode .bg-\[\#152030\]:not(aside):not(aside *) { background-color: #f8fafc !important; }
+
+/* ── Primary text ────────────────────────────────────────────── */
+html.light-mode .text-\[\#F0EBE1\] { color: #0f172a !important; }
+html.light-mode .text-\[\#A9B8C6\] { color: #475569 !important; }
+html.light-mode .text-\[\#6B7E8E\] { color: #94a3b8 !important; }
+html.light-mode .text-\[\#7a9ab5\] { color: #64748b !important; }
+html.light-mode .text-\[\#8a9bb0\] { color: #64748b !important; }
+
+/* ── Borders ─────────────────────────────────────────────────── */
+html.light-mode .border-\[\#ffffff14\] { border-color: #e2e8f0 !important; }
+html.light-mode .border-\[\#ffffff0a\] { border-color: #f1f5f9 !important; }
+html.light-mode .border-\[\#ffffff08\] { border-color: #f1f5f9 !important; }
+html.light-mode .border-\[\#ffffff1a\] { border-color: #e2e8f0 !important; }
+html.light-mode .border-\[\#ffffff10\] { border-color: #e2e8f0 !important; }
+html.light-mode .border-\[\#1e3a56\]   { border-color: #cbd5e1 !important; }
+html.light-mode .border-\[\#1d3348\]   { border-color: #cbd5e1 !important; }
+html.light-mode .border-\[\#2a4a68\]   { border-color: #cbd5e1 !important; }
+
+/* ── Divide (table / list separators) ────────────────────────── */
+html.light-mode .divide-\[\#ffffff08\] > * + * { border-color: #f1f5f9 !important; }
+html.light-mode .divide-\[\#ffffff0a\] > * + * { border-color: #f1f5f9 !important; }
+html.light-mode .divide-\[\#1e3a56\] > * + *   { border-color: #e2e8f0 !important; }
+
+/* ── Subtle hover backgrounds ────────────────────────────────── */
+html.light-mode .hover\:bg-\[rgba\(255\2c255\2c255\2c0\.03\)\]:hover { background-color: rgba(0,0,0,0.02) !important; }
+html.light-mode .hover\:bg-\[rgba\(255\2c255\2c255\2c0\.06\)\]:hover { background-color: rgba(0,0,0,0.04) !important; }
+html.light-mode .hover\:bg-white\/5:hover  { background-color: rgba(0,0,0,0.03) !important; }
+html.light-mode .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.05) !important; }
+
+/* ── Input / form fields in dark sections ────────────────────── */
+html.light-mode input.bg-\[\#0B1929\],
+html.light-mode input.bg-\[\#112236\],
+html.light-mode select.bg-\[\#0B1929\],
+html.light-mode select.bg-\[\#112236\],
+html.light-mode textarea.bg-\[\#0B1929\],
+html.light-mode textarea.bg-\[\#112236\] {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+}
+
+/* ── Scrollbar (light mode) ──────────────────────────────────── */
+html.light-mode ::-webkit-scrollbar-track { background: #f1f5f9; }
+html.light-mode ::-webkit-scrollbar-thumb { background: #cbd5e1; }
+html.light-mode ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ── Theme toggle button transition ──────────────────────────── */
+.theme-toggle-btn {
+    transition: all 0.2s ease;
+}

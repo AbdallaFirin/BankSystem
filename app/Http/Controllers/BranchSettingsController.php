@@ -7,6 +7,7 @@ use App\Models\Account;
 use App\Models\Branch;
 use App\Models\CashAllocation;
 use App\Models\LedgerEntry;
+use App\Models\Role;
 use App\Models\Staff;
 use App\Models\Transaction;
 use App\Models\Customer;
@@ -52,10 +53,15 @@ class BranchSettingsController extends Controller
             ->get()
             ->map(fn($s) => ['id' => $s->id, 'full_name' => $s->full_name, 'role' => $s->role?->role_name]);
 
+        $roles = Role::whereNotIn('role_name', ['Super Admin'])
+            ->orderBy('role_name')
+            ->get(['id', 'role_name', 'txn_limit']);
+
         return Inertia::render('Staff/BranchManager/BranchSettings', [
             'branch'    => $branch,
             'stats'     => $stats,
             'staff_list'=> $staffList,
+            'roles'     => $roles,
         ]);
     }
 
@@ -139,5 +145,21 @@ class BranchSettingsController extends Controller
         });
 
         return back()->with('success', 'Vault deposit of $' . number_format($request->amount, 2) . ' recorded successfully.');
+    }
+
+    /* ─────────────────────────────────────────────
+     *  PUT /staff/branch/settings/roles/{id}/limit
+     *  Branch Manager / Teller Supervisor: update a role's txn_limit
+     * ───────────────────────────────────────────── */
+    public function updateRoleLimit(Request $request, int $id)
+    {
+        $request->validate([
+            'txn_limit' => 'nullable|numeric|min:0',
+        ]);
+
+        $role = Role::whereNotIn('role_name', ['Super Admin'])->findOrFail($id);
+        $role->update(['txn_limit' => $request->txn_limit === '' ? null : $request->txn_limit]);
+
+        return back()->with('success', "Transaction limit for \"{$role->role_name}\" updated successfully.");
     }
 }

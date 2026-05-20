@@ -7,12 +7,15 @@
         <title inertia>Gobaad Bank</title>
 
         <!-- Favicon -->
-        <link rel="icon" type="image/png" href="/storage/images/MAin Logo.png" />
-        <link rel="apple-touch-icon" href="/storage/images/MAin Logo.png" />
+        <link rel="icon" type="image/png" href="/images/MAin Logo.png" />
+        <link rel="apple-touch-icon" href="/images/MAin Logo.png" />
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+
+        <!-- Tabler Icons -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
 
         <!-- Scripts -->
         @routes

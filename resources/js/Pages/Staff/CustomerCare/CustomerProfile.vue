@@ -4,7 +4,8 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 
 const props = defineProps({
-    customer: Object
+    customer: Object,
+    branches: { type: Array, default: () => [] },
 });
 
 const kycColor = {
@@ -24,6 +25,35 @@ const statusColor = {
 const fmt = (v) => v || '—';
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const fmtMoney = (n) => n !== undefined ? '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '$0.00';
+
+/* ── Portal access modal ── */
+const portalAccessModal = ref(false)
+const portalAccessForm  = useForm({})
+
+// Compute the actual temp password components from customer data
+const portalLast4 = computed(() => {
+    const digits = (props.customer.phone ?? '').replace(/\D/g, '')
+    return digits.slice(-4) || '????'
+})
+const portalBirthYear = computed(() => {
+    if (!props.customer.dob) return '????'
+    const y = new Date(props.customer.dob).getFullYear()
+    return isNaN(y) ? '????' : String(y)
+})
+const portalTempPassword = computed(() => portalLast4.value + portalBirthYear.value)
+
+function openPortalAccessModal() {
+    portalAccessModal.value = true
+}
+function closePortalAccessModal() {
+    portalAccessModal.value = false
+}
+function submitPortalAccess() {
+    portalAccessForm.post(route('staff.customer-care.portal-access', props.customer.id), {
+        preserveScroll: true,
+        onSuccess: () => closePortalAccessModal(),
+    })
+}
 
 /* ── Statement date-range modal ── */
 const showStmtModal = ref(false)
@@ -237,11 +267,90 @@ function submitFreeze() {
     })
 }
 
-const unfreezeForm = useForm({})
-function submitUnfreeze(acc) {
-    if (!confirm(`Unfreeze account ${acc.account_number}? All transactions will be re-enabled.`)) return
-    unfreezeForm.post(route('staff.customer-care.accounts.unfreeze', acc.id), {
+/* ── Unfreeze modal (with optional notes) ── */
+const unfreezeModal   = ref(false)
+const unfreezeAccount = ref(null)
+const unfreezeForm    = useForm({ notes: '' })
+
+function openUnfreezeModal(acc) {
+    unfreezeAccount.value = acc
+    unfreezeForm.reset()
+    unfreezeModal.value   = true
+}
+function closeUnfreezeModal() {
+    unfreezeModal.value   = false
+    unfreezeAccount.value = null
+    unfreezeForm.reset()
+}
+function submitUnfreeze() {
+    unfreezeForm.post(route('staff.customer-care.accounts.unfreeze', unfreezeAccount.value.id), {
         preserveScroll: true,
+        onSuccess: () => closeUnfreezeModal(),
+    })
+}
+
+/* ── Freeze history toggle per account ── */
+const showFreezeHistory = ref({})
+function toggleFreezeHistory(accId) {
+    showFreezeHistory.value[accId] = !showFreezeHistory.value[accId]
+}
+
+const fmtDateTime = (d) => d ? new Date(d).toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—'
+
+/* ══════════════════════════════════════════
+   Edit Customer Info Modal
+   ══════════════════════════════════════════ */
+const editModal = ref(false)
+
+const editForm = useForm({
+    phone:                       props.customer.phone ?? '',
+    secondary_phone:             props.customer.secondary_phone ?? '',
+    email:                       props.customer.email ?? '',
+    region_city:                 props.customer.region_city ?? '',
+    district:                    props.customer.district ?? '',
+    street_neighbourhood:        props.customer.street_neighbourhood ?? '',
+    address:                     props.customer.address ?? '',
+    employment_status:           props.customer.employment_status ?? '',
+    employer_name:                props.customer.employer_name ?? '',
+    monthly_income_range:        props.customer.monthly_income_range ?? '',
+    source_of_funds:             props.customer.source_of_funds ?? '',
+    expected_monthly_transactions: props.customer.expected_monthly_transactions ?? '',
+    next_of_kin_name:            props.customer.next_of_kin_name ?? '',
+    next_of_kin_relation:        props.customer.next_of_kin_relation ?? '',
+    next_of_kin_phone:           props.customer.next_of_kin_phone ?? '',
+    preferred_contact_method:    props.customer.preferred_contact_method ?? '',
+})
+
+function openEditModal() {
+    // reset to latest props (in case page has refreshed)
+    editForm.phone                        = props.customer.phone ?? ''
+    editForm.secondary_phone              = props.customer.secondary_phone ?? ''
+    editForm.email                        = props.customer.email ?? ''
+    editForm.region_city                  = props.customer.region_city ?? ''
+    editForm.district                     = props.customer.district ?? ''
+    editForm.street_neighbourhood         = props.customer.street_neighbourhood ?? ''
+    editForm.address                      = props.customer.address ?? ''
+    editForm.employment_status            = props.customer.employment_status ?? ''
+    editForm.employer_name                = props.customer.employer_name ?? ''
+    editForm.monthly_income_range         = props.customer.monthly_income_range ?? ''
+    editForm.source_of_funds              = props.customer.source_of_funds ?? ''
+    editForm.expected_monthly_transactions = props.customer.expected_monthly_transactions ?? ''
+    editForm.next_of_kin_name             = props.customer.next_of_kin_name ?? ''
+    editForm.next_of_kin_relation         = props.customer.next_of_kin_relation ?? ''
+    editForm.next_of_kin_phone            = props.customer.next_of_kin_phone ?? ''
+    editForm.preferred_contact_method     = props.customer.preferred_contact_method ?? ''
+    editModal.value = true
+}
+
+function closeEditModal() {
+    editModal.value = false
+    editForm.clearErrors()
+}
+
+function submitEdit() {
+    editForm.put(route('staff.customer-care.customers.update', props.customer.id), {
+        preserveScroll: true,
+        onSuccess: () => closeEditModal(),
     })
 }
 </script>
@@ -273,7 +382,12 @@ function submitUnfreeze(acc) {
                         </div>
                     </div>
                 </div>
-                <div class="flex gap-3">
+                <div class="flex flex-wrap gap-3">
+                    <!-- Edit Customer Info -->
+                    <button @click="openEditModal"
+                            class="px-5 py-2.5 rounded-xl bg-[rgba(255,255,255,0.06)] text-[#A9B8C6] border border-[rgba(255,255,255,0.12)] text-sm font-bold hover:bg-[rgba(255,255,255,0.1)] hover:text-[#F0EBE1] transition flex items-center gap-2">
+                        <i class="ti ti-pencil"></i>Edit Info
+                    </button>
                     <Link v-if="customer.kyc_status === 'pending' || customer.kyc_status === 'under_review'"
                           :href="route('staff.customer-care.kyc', customer.id)"
                           class="px-5 py-2.5 rounded-xl bg-[rgba(201,168,76,0.1)] text-[#C9A84C] border border-[rgba(201,168,76,0.2)] text-sm font-bold hover:bg-[rgba(201,168,76,0.15)] transition">
@@ -284,6 +398,12 @@ function submitUnfreeze(acc) {
                           class="px-5 py-2.5 rounded-xl bg-[#C9A84C] text-[#0B1929] text-sm font-bold hover:bg-[#E5C97E] transition">
                         <i class="ti ti-circle-plus mr-2"></i>Open Account
                     </Link>
+                    <button v-if="customer.kyc_status === 'verified'"
+                        @click="openPortalAccessModal"
+                        class="px-5 py-2.5 rounded-xl bg-[rgba(76,175,125,0.12)] text-[#4CAF7D] border border-[rgba(76,175,125,0.25)] text-sm font-bold hover:bg-[rgba(76,175,125,0.2)] transition flex items-center gap-2">
+                        <i class="ti ti-send"></i>
+                        Send Portal Access
+                    </button>
                 </div>
             </div>
 
@@ -414,10 +534,31 @@ function submitUnfreeze(acc) {
                                         <i class="ti ti-arrows-right-left mr-1"></i>Transfer
                                     </button>
                                 </div>
-                                <!-- Row 3: Account management + Freeze -->
+                                <!-- Row 3: Freeze banner + history -->
                                 <div v-if="acc.is_frozen" class="px-3 py-2 rounded-lg bg-blue-900/20 border border-blue-700/30 text-xs text-blue-300 flex items-start gap-2">
                                     <i class="ti ti-snowflake shrink-0 mt-0.5"></i>
                                     <span><strong>Frozen:</strong> {{ acc.frozen_reason }}</span>
+                                </div>
+                                <!-- Freeze history toggle -->
+                                <div v-if="acc.freeze_logs?.length">
+                                    <button @click="toggleFreezeHistory(acc.id)"
+                                            class="w-full text-left text-[10px] text-slate-500 hover:text-slate-300 transition flex items-center gap-1.5 py-1">
+                                        <i :class="showFreezeHistory[acc.id] ? 'ti ti-chevron-up' : 'ti ti-chevron-down'"></i>
+                                        Freeze History ({{ acc.freeze_logs.length }})
+                                    </button>
+                                    <div v-if="showFreezeHistory[acc.id]" class="mt-1 rounded-xl border border-slate-700/50 overflow-hidden">
+                                        <div v-for="log in acc.freeze_logs" :key="log.id"
+                                             class="flex items-start gap-2.5 px-3 py-2 border-b border-slate-800 last:border-0 text-[10px]">
+                                            <span class="shrink-0 mt-0.5 px-1.5 py-0.5 rounded font-bold uppercase"
+                                                  :class="log.action === 'freeze' ? 'bg-blue-900/40 text-blue-300' : 'bg-emerald-900/40 text-emerald-300'">
+                                                {{ log.action }}
+                                            </span>
+                                            <div class="min-w-0">
+                                                <p class="text-slate-400">{{ fmtDateTime(log.created_at) }} · <span class="text-slate-300">{{ log.performed_by?.full_name ?? '—' }}</span></p>
+                                                <p v-if="log.reason || log.notes" class="text-slate-500 italic truncate">{{ log.reason || log.notes }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="flex gap-2 pt-1.5">
                                     <button @click="openStatusModal(acc)"
@@ -435,7 +576,7 @@ function submitUnfreeze(acc) {
                                         <i class="ti ti-snowflake mr-1"></i>Freeze
                                     </button>
                                     <button v-if="acc.is_frozen"
-                                            @click="submitUnfreeze(acc)"
+                                            @click="openUnfreezeModal(acc)"
                                             class="flex-1 py-2 rounded-lg text-xs font-bold text-emerald-400 bg-emerald-900/20 border border-emerald-700/30 hover:bg-emerald-900/40 transition">
                                         <i class="ti ti-lock-open mr-1"></i>Unfreeze
                                     </button>
@@ -511,7 +652,7 @@ function submitUnfreeze(acc) {
                                                     <i class="ti ti-snowflake"></i> Freeze
                                                 </button>
                                                 <button v-if="acc.is_frozen"
-                                                        @click="submitUnfreeze(acc)"
+                                                        @click="openUnfreezeModal(acc)"
                                                         class="text-[11px] px-2.5 py-1.5 rounded-lg font-bold text-emerald-400 bg-emerald-900/20 border border-emerald-700/30 hover:bg-emerald-900/40 transition">
                                                     <i class="ti ti-lock-open"></i> Unfreeze
                                                 </button>
@@ -893,6 +1034,61 @@ function submitUnfreeze(acc) {
         </Transition>
     </Teleport>
 
+    <!-- ══════════ Unfreeze Account Modal ══════════ -->
+    <Teleport to="body">
+        <Transition name="modal">
+            <div v-if="unfreezeModal"
+                 class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+                <div class="bg-[#112236] border border-emerald-700/30 rounded-2xl shadow-2xl w-full max-w-md">
+                    <div class="px-6 py-5 border-b border-slate-700/60 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-xl bg-emerald-900/40 flex items-center justify-center">
+                                <i class="ti ti-lock-open text-emerald-300 text-lg"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-white text-sm">Unfreeze Account</h3>
+                                <p class="font-mono text-xs text-slate-400 mt-0.5">{{ unfreezeAccount?.account_number }}</p>
+                            </div>
+                        </div>
+                        <button @click="closeUnfreezeModal" class="text-slate-400 hover:text-white transition-colors">
+                            <i class="ti ti-x text-lg"></i>
+                        </button>
+                    </div>
+                    <div class="px-6 py-5 space-y-4">
+                        <div class="flex items-start gap-3 p-3 rounded-xl bg-emerald-900/20 border border-emerald-700/30">
+                            <i class="ti ti-info-circle text-emerald-400 mt-0.5 shrink-0"></i>
+                            <p class="text-xs text-emerald-300 leading-relaxed">
+                                Unfreezing will re-enable all deposits, withdrawals, and transfers on this account.
+                            </p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                                Unfreeze Notes <span class="text-slate-500 normal-case">(optional)</span>
+                            </label>
+                            <textarea v-model="unfreezeForm.notes" rows="2"
+                                      class="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white
+                                             placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 transition-colors resize-none"
+                                      placeholder="e.g. Investigation cleared, court order lifted…">
+                            </textarea>
+                        </div>
+                        <div class="flex gap-3 pt-1">
+                            <button @click="closeUnfreezeModal"
+                                    class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+                                Cancel
+                            </button>
+                            <button @click="submitUnfreeze"
+                                    :disabled="unfreezeForm.processing"
+                                    class="flex-1 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
+                                <i :class="unfreezeForm.processing ? 'ti ti-loader animate-spin' : 'ti ti-lock-open'"></i>
+                                {{ unfreezeForm.processing ? 'Unfreezing…' : 'Confirm Unfreeze' }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </Transition>
+    </Teleport>
+
     <!-- ══════════ Freeze Account Modal ══════════ -->
     <Teleport to="body">
         <Transition name="modal">
@@ -953,6 +1149,326 @@ function submitUnfreeze(acc) {
                                 {{ freezeForm.processing ? 'Freezing…' : 'Confirm Freeze' }}
                             </button>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </Transition>
+    </Teleport>
+
+    <!-- ── Portal Access Confirmation Modal ── -->
+    <Teleport to="body">
+        <Transition name="modal">
+            <div v-if="portalAccessModal"
+                 class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+                 @click.self="closePortalAccessModal">
+
+                <div class="bg-[#112236] border border-emerald-700/30 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+
+                    <!-- Top accent bar -->
+                    <div class="h-1 bg-gradient-to-r from-[#4CAF7D] via-[#3dd68c] to-[#4CAF7D]"></div>
+
+                    <!-- Header -->
+                    <div class="px-6 pt-6 pb-4 flex items-start justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-11 h-11 rounded-2xl bg-emerald-900/50 border border-emerald-700/30 flex items-center justify-center flex-shrink-0">
+                                <i class="ti ti-send text-emerald-300 text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-white text-base leading-tight">Send Portal Access</h3>
+                                <p class="text-xs text-slate-400 mt-0.5">Customer credentials delivery</p>
+                            </div>
+                        </div>
+                        <button @click="closePortalAccessModal"
+                            class="text-slate-500 hover:text-white transition-colors mt-0.5 p-1 rounded-lg hover:bg-white/5">
+                            <i class="ti ti-x text-lg"></i>
+                        </button>
+                    </div>
+
+                    <!-- Customer info strip -->
+                    <div class="mx-6 mb-5 bg-slate-800/50 border border-slate-700/40 rounded-xl px-4 py-3 flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-full bg-[#0B1929] border border-[#C9A84C]/30 flex items-center justify-center flex-shrink-0">
+                            <span class="text-[#C9A84C] font-bold text-sm">
+                                {{ customer.full_name?.charAt(0) ?? '?' }}
+                            </span>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-white truncate">{{ customer.full_name }}</p>
+                            <p class="text-xs text-slate-400 font-mono truncate">{{ customer.phone }}</p>
+                        </div>
+                    </div>
+
+                    <!-- Body -->
+                    <div class="px-6 pb-4 space-y-3">
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            A <span class="text-white font-semibold">temporary password</span> will be generated for this customer and delivered to their registered email address.
+                        </p>
+
+                        <!-- How it's generated — shows real customer data -->
+                        <div class="bg-slate-800/40 border border-slate-700/30 rounded-xl px-4 py-3 space-y-3">
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-[#C9A84C]">Password Formula</p>
+
+                            <!-- Visual formula -->
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <div class="flex flex-col items-center gap-1">
+                                    <span class="px-3 py-1.5 bg-slate-700/60 border border-slate-600/40 rounded-lg text-sm font-mono font-bold text-white tracking-widest">
+                                        {{ portalLast4 }}
+                                    </span>
+                                    <span class="text-[10px] text-slate-500">last 4 of phone</span>
+                                </div>
+                                <span class="text-slate-500 text-base font-bold mb-4">+</span>
+                                <div class="flex flex-col items-center gap-1">
+                                    <span class="px-3 py-1.5 bg-slate-700/60 border border-slate-600/40 rounded-lg text-sm font-mono font-bold text-white tracking-widest">
+                                        {{ portalBirthYear }}
+                                    </span>
+                                    <span class="text-[10px] text-slate-500">birth year</span>
+                                </div>
+                                <span class="text-slate-500 text-base font-bold mb-4">=</span>
+                                <div class="flex flex-col items-center gap-1">
+                                    <span class="px-3 py-1.5 bg-emerald-900/40 border border-emerald-700/40 rounded-lg text-sm font-mono font-bold text-[#4CAF7D] tracking-widest">
+                                        {{ portalTempPassword }}
+                                    </span>
+                                    <span class="text-[10px] text-emerald-600/80">temp password</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- No-email warning -->
+                        <div v-if="!customer.email"
+                            class="flex items-start gap-2 bg-red-900/20 border border-red-700/30 rounded-xl px-3 py-3">
+                            <i class="ti ti-mail-off text-red-400 text-base flex-shrink-0 mt-0.5"></i>
+                            <div>
+                                <p class="text-xs font-semibold text-red-300">No email address on record</p>
+                                <p class="text-[11px] text-red-400/80 mt-0.5">This customer has no email. The portal access cannot be sent. Please update their profile with a valid email address first.</p>
+                            </div>
+                        </div>
+
+                        <div v-else class="flex items-start gap-2 text-[11px] text-slate-500">
+                            <i class="ti ti-mail-check mt-0.5 flex-shrink-0 text-sm text-emerald-600/80"></i>
+                            <span>Email will be sent to <span class="text-slate-300 font-mono">{{ customer.email }}</span></span>
+                        </div>
+
+                        <div class="flex items-start gap-2 text-[11px] text-slate-500">
+                            <i class="ti ti-info-circle mt-0.5 flex-shrink-0 text-sm"></i>
+                            <span>The customer will be required to change this password on first login.</span>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="px-6 pb-6 flex gap-3">
+                        <button
+                            @click="submitPortalAccess"
+                            :disabled="portalAccessForm.processing || !customer.email"
+                            class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            <svg v-if="portalAccessForm.processing" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                            </svg>
+                            <i v-else class="ti ti-send text-base"></i>
+                            {{ portalAccessForm.processing ? 'Sending…' : 'Send Credentials' }}
+                        </button>
+                        <button
+                            @click="closePortalAccessModal"
+                            :disabled="portalAccessForm.processing"
+                            class="px-5 py-2.5 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 font-semibold text-sm transition-colors disabled:opacity-40"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </Transition>
+    </Teleport>
+
+    <!-- ══════════ Edit Customer Info Modal ══════════ -->
+    <Teleport to="body">
+        <Transition name="modal">
+            <div v-if="editModal"
+                 class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+                <div class="bg-[#0B1929] border border-slate-700/60 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+
+                    <!-- Header -->
+                    <div class="px-6 py-5 border-b border-slate-700/60 flex items-center justify-between shrink-0">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-xl bg-[#C9A84C]/10 flex items-center justify-center">
+                                <i class="ti ti-pencil text-[#C9A84C] text-lg"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-white text-sm">Edit Customer Information</h3>
+                                <p class="text-xs text-slate-400 mt-0.5">{{ customer.full_name }}</p>
+                            </div>
+                        </div>
+                        <button @click="closeEditModal" class="text-slate-400 hover:text-white transition">
+                            <i class="ti ti-x text-lg"></i>
+                        </button>
+                    </div>
+
+                    <!-- Scrollable Form -->
+                    <form @submit.prevent="submitEdit" class="overflow-y-auto flex-1 px-6 py-5 space-y-6">
+
+                        <!-- Contact Information -->
+                        <div>
+                            <h4 class="text-[10px] uppercase tracking-widest text-[#C9A84C] font-bold mb-3 flex items-center gap-2">
+                                <i class="ti ti-phone"></i> Contact Information
+                            </h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">Primary Phone *</label>
+                                    <input v-model="editForm.phone" type="tel" required
+                                           class="w-full bg-slate-800 border rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#C9A84C] transition"
+                                           :class="editForm.errors.phone ? 'border-red-500' : 'border-slate-600'" />
+                                    <p v-if="editForm.errors.phone" class="mt-1 text-xs text-red-400">{{ editForm.errors.phone }}</p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">Secondary Phone</label>
+                                    <input v-model="editForm.secondary_phone" type="tel"
+                                           class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#C9A84C] transition" />
+                                </div>
+                                <div class="sm:col-span-2">
+                                    <label class="block text-xs text-slate-400 mb-1">Email Address</label>
+                                    <input v-model="editForm.email" type="email"
+                                           class="w-full bg-slate-800 border rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#C9A84C] transition"
+                                           :class="editForm.errors.email ? 'border-red-500' : 'border-slate-600'" />
+                                    <p v-if="editForm.errors.email" class="mt-1 text-xs text-red-400">{{ editForm.errors.email }}</p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">Preferred Contact</label>
+                                    <select v-model="editForm.preferred_contact_method"
+                                            class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#C9A84C] transition">
+                                        <option value="">Select…</option>
+                                        <option>Phone</option>
+                                        <option>Email</option>
+                                        <option>SMS</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Address -->
+                        <div>
+                            <h4 class="text-[10px] uppercase tracking-widest text-[#C9A84C] font-bold mb-3 flex items-center gap-2">
+                                <i class="ti ti-map-pin"></i> Address
+                            </h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">Region / City</label>
+                                    <input v-model="editForm.region_city" type="text"
+                                           class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#C9A84C] transition" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">District</label>
+                                    <input v-model="editForm.district" type="text"
+                                           class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#C9A84C] transition" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">Street / Neighbourhood</label>
+                                    <input v-model="editForm.street_neighbourhood" type="text"
+                                           class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#C9A84C] transition" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">Full Address</label>
+                                    <input v-model="editForm.address" type="text"
+                                           class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#C9A84C] transition" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Employment / Financial -->
+                        <div>
+                            <h4 class="text-[10px] uppercase tracking-widest text-[#C9A84C] font-bold mb-3 flex items-center gap-2">
+                                <i class="ti ti-briefcase"></i> Employment &amp; Financial
+                            </h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">Employment Status</label>
+                                    <select v-model="editForm.employment_status"
+                                            class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#C9A84C] transition">
+                                        <option value="">Select…</option>
+                                        <option>Employed</option>
+                                        <option>Self-employed</option>
+                                        <option>Unemployed</option>
+                                        <option>Retired</option>
+                                        <option>Student</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">Employer Name</label>
+                                    <input v-model="editForm.employer_name" type="text"
+                                           class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#C9A84C] transition" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">Monthly Income Range</label>
+                                    <select v-model="editForm.monthly_income_range"
+                                            class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#C9A84C] transition">
+                                        <option value="">Select…</option>
+                                        <option>Under $500</option>
+                                        <option>$500 – $1,000</option>
+                                        <option>$1,000 – $3,000</option>
+                                        <option>$3,000 – $10,000</option>
+                                        <option>Over $10,000</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">Source of Funds</label>
+                                    <input v-model="editForm.source_of_funds" type="text"
+                                           class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#C9A84C] transition" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">Expected Monthly Transactions</label>
+                                    <select v-model="editForm.expected_monthly_transactions"
+                                            class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#C9A84C] transition">
+                                        <option value="">Select…</option>
+                                        <option>1 – 5</option>
+                                        <option>5 – 20</option>
+                                        <option>20 – 50</option>
+                                        <option>50+</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Next of Kin -->
+                        <div>
+                            <h4 class="text-[10px] uppercase tracking-widest text-[#C9A84C] font-bold mb-3 flex items-center gap-2">
+                                <i class="ti ti-users"></i> Next of Kin
+                            </h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">Full Name</label>
+                                    <input v-model="editForm.next_of_kin_name" type="text"
+                                           class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#C9A84C] transition" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">Relationship</label>
+                                    <input v-model="editForm.next_of_kin_relation" type="text"
+                                           class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#C9A84C] transition" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">Phone</label>
+                                    <input v-model="editForm.next_of_kin_phone" type="tel"
+                                           class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#C9A84C] transition" />
+                                </div>
+                            </div>
+                        </div>
+
+                    </form>
+
+                    <!-- Footer Actions -->
+                    <div class="px-6 py-4 border-t border-slate-700/60 flex gap-3 shrink-0">
+                        <button type="button" @click="submitEdit" :disabled="editForm.processing"
+                                class="flex-1 flex items-center justify-center gap-2 bg-[#C9A84C] hover:bg-[#b8973e] disabled:opacity-50 text-[#0B1929] font-bold py-2.5 rounded-xl text-sm transition-colors">
+                            <svg v-if="editForm.processing" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                            </svg>
+                            <i v-else class="ti ti-device-floppy text-base"></i>
+                            {{ editForm.processing ? 'Saving…' : 'Save Changes' }}
+                        </button>
+                        <button type="button" @click="closeEditModal" :disabled="editForm.processing"
+                                class="px-6 py-2.5 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 font-semibold text-sm transition-colors disabled:opacity-40">
+                            Cancel
+                        </button>
                     </div>
                 </div>
             </div>

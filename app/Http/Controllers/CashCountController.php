@@ -92,13 +92,24 @@ class CashCountController extends Controller
         $physicalTotal = collect($request->denominations)
             ->sum(fn($d) => (float)$d['denomination'] * (int)$d['quantity']);
 
-        // Vault / system balance at this moment
-        $vault         = Account::where('account_number', 'VAULT-' . $staff->branch_id)->first();
-        $systemBalance = $vault
-            ? (float) LedgerEntry::where('account_id', $vault->id)
+        // System balance: use teller's till if active, otherwise vault
+        $activeAlloc = CashAllocation::where('teller_id', $staff->id)
+            ->where('status', 'acknowledged')
+            ->latest('allocated_at')
+            ->first();
+
+        if ($activeAlloc) {
+            $systemBalance = (float) LedgerEntry::where('account_id', $activeAlloc->till_account_id)
                 ->selectRaw("SUM(CASE WHEN entry_type='credit' THEN amount ELSE -amount END) as bal")
-                ->value('bal') ?? 0
-            : 0.0;
+                ->value('bal') ?? 0.0;
+        } else {
+            $vault         = Account::where('account_number', 'VAULT-' . $staff->branch_id)->first();
+            $systemBalance = $vault
+                ? (float) LedgerEntry::where('account_id', $vault->id)
+                    ->selectRaw("SUM(CASE WHEN entry_type='credit' THEN amount ELSE -amount END) as bal")
+                    ->value('bal') ?? 0
+                : 0.0;
+        }
 
         $difference = round($physicalTotal - $systemBalance, 2);
 

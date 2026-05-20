@@ -100,6 +100,36 @@ body {
     color: #555555;
 }
 .served-by strong { color: #1a1a1a; }
+
+/* ── Remarks ── */
+.remarks-box {
+    margin: 6px 8px;
+    padding: 5px 8px;
+    background: #fafafa;
+    border: 1px dashed #d8d8d8;
+    border-radius: 3px;
+}
+.remarks-label { font-size: 7.5px; color: #999999; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+.remarks-text  { font-size: 8.5px; color: #444444; font-style: italic; }
+
+/* ── Signatures ── */
+.sig-section {
+    margin: 10px 8px 0;
+    padding-top: 10px;
+    border-top: 1px dashed #cccccc;
+}
+.sig-title {
+    font-size: 8px;
+    color: #aaaaaa;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    text-align: center;
+    margin-bottom: 14px;
+}
+.sig-block { margin-bottom: 20px; }
+.sig-line  { height: 28px; border-bottom: 1.5px solid #888888; margin-bottom: 5px; }
+.sig-meta  { font-size: 8px; color: #888888; }
+.sig-meta strong { color: #555555; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -147,7 +177,7 @@ body {
 
 <!-- Header -->
 <div class="header">
-    <img src="{{ storage_path('app/public/images/MAin Logo.png') }}" class="logo" alt="Gobaad Bank" />
+    <img src="{{ public_path('images/MAin Logo.png') }}" class="logo" alt="Gobaad Bank" />
     <div class="bank-name">Gobaad Bank</div>
     <div class="bank-sub">Official Transaction Receipt</div>
 </div>
@@ -208,10 +238,10 @@ body {
 </div>
 @endif
 
-@if($txn->description)
-<div class="field-row">
-    <span class="field-label">Note</span>
-    <span class="field-value">{{ $txn->description }}</span>
+@if($txn->description && !in_array($txn->description, ['Cash Deposit','Cash Withdrawal','Inter-Account Transfer','Deposit','Withdrawal']))
+<div class="remarks-box">
+    <div class="remarks-label">Remarks</div>
+    <div class="remarks-text">{{ $txn->description }}</div>
 </div>
 @endif
 
@@ -229,6 +259,12 @@ body {
     <span class="field-label">Branch</span>
     <span class="field-value">{{ $txn->initiator?->branch?->branch_name ?? '—' }}</span>
 </div>
+@if($txn->initiator?->branch?->swift_code)
+<div class="field-row">
+    <span class="field-label">SWIFT Code</span>
+    <span class="field-value mono">{{ $txn->initiator->branch->swift_code }}</span>
+</div>
+@endif
 <div class="field-row">
     <span class="field-label">Printed</span>
     <span class="field-value mono">{{ $printDate }} {{ $printTime }}</span>
@@ -244,11 +280,37 @@ body {
     &nbsp;·&nbsp;{{ $txn->initiator?->role?->role_name ?? '—' }}
 </div>
 
+<!-- Signatures -->
+<div class="sig-section">
+    <p class="sig-title">Authorized Signatures</p>
+    <div class="sig-block">
+        <div class="sig-line"></div>
+        <p class="sig-meta">
+            <strong>Teller:</strong> {{ $txn->initiator?->full_name ?? '—' }}
+        </p>
+    </div>
+    <div class="sig-block">
+        <div class="sig-line"></div>
+        <p class="sig-meta">
+            <strong>Customer:</strong>
+            @php
+                $sigCustomer = match($txn->type) {
+                    'deposit'    => $toAcc?->customer?->full_name   ?? '—',
+                    'withdrawal' => $fromAcc?->customer?->full_name ?? '—',
+                    'transfer'   => $fromAcc?->customer?->full_name ?? '—',
+                    default      => $fromAcc?->customer?->full_name ?? '—',
+                };
+            @endphp
+            {{ $sigCustomer }}
+        </p>
+    </div>
+</div>
+
 <!-- Footer -->
 <div class="footer">
     <div class="footer-ref">Ref: {{ $txn->reference }}</div>
     <div class="footer-note">Please retain this receipt for your records.</div>
-    <div class="footer-note">Gobaad Bank · All amounts in USD</div>
+    <div class="footer-note">Gobaad Bank · All amounts in USD@if($txn->initiator?->branch?->swift_code) · SWIFT: {{ $txn->initiator->branch->swift_code }}@endif</div>
 </div>
 
 </body>

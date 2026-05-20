@@ -8,7 +8,7 @@ class AccountType extends Model
 {
     protected $fillable = [
         'type_name', 'interest_rate', 'min_balance',
-        'withdrawal_limit', 'overdraft_allowed', 'is_active',
+        'withdrawal_limit', 'overdraft_allowed', 'overdraft_limit', 'is_active',
     ];
 
     protected $casts = [

@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { Head, Link } from '@inertiajs/vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
+import VueApexCharts from 'vue3-apexcharts'
 
 const props = defineProps({
     vault_balance:        { type: Number,  default: 0 },
@@ -140,6 +141,94 @@ function breakdownPct(type) {
 const maxTrendCount = computed(() => {
     const counts = props.weekly_trend.map(d => d.count)
     return Math.max(...counts, 1)
+})
+
+/* ── ApexCharts: 7-day bar + line chart ── */
+const trendChartOptions = computed(() => ({
+    chart: {
+        type: 'bar',
+        height: 200,
+        background: 'transparent',
+        toolbar: { show: false },
+        sparkline: { enabled: false },
+    },
+    theme: { mode: 'dark' },
+    colors: ['#C9A84C', '#3b82f6'],
+    plotOptions: {
+        bar: { borderRadius: 4, columnWidth: '55%' }
+    },
+    dataLabels: { enabled: false },
+    stroke: { curve: 'smooth', width: [0, 2] },
+    xaxis: {
+        categories: props.weekly_trend.map(d => d.label),
+        labels: { style: { colors: '#64748b', fontSize: '11px' } },
+        axisBorder: { show: false },
+        axisTicks: { show: false },
+    },
+    yaxis: [
+        {
+            labels: { style: { colors: '#64748b', fontSize: '11px' },
+                      formatter: v => Math.round(v) },
+        },
+        {
+            opposite: true,
+            labels: {
+                style: { colors: '#64748b', fontSize: '11px' },
+                formatter: v => v >= 1000 ? `$${(v/1000).toFixed(1)}k` : `$${v}`
+            }
+        }
+    ],
+    grid: { borderColor: '#1e293b', strokeDashArray: 3 },
+    tooltip: {
+        theme: 'dark',
+        y: [
+            { formatter: v => `${v} txns` },
+            { formatter: v => `$${Number(v).toLocaleString('en-US', { minimumFractionDigits: 0 })}` },
+        ]
+    },
+    legend: { labels: { colors: '#94a3b8' } },
+}))
+
+const trendChartSeries = computed(() => [
+    { name: 'Transactions', type: 'bar', data: props.weekly_trend.map(d => d.count) },
+    { name: 'Volume ($)',   type: 'line', data: props.weekly_trend.map(d => Math.round(d.amount)) },
+])
+
+/* ── ApexCharts: transaction type donut ── */
+const donutOptions = computed(() => ({
+    chart: { type: 'donut', background: 'transparent', toolbar: { show: false } },
+    theme: { mode: 'dark' },
+    colors: ['#10b981', '#ef4444', '#6366f1'],
+    labels: ['Deposits', 'Withdrawals', 'Transfers'],
+    dataLabels: { enabled: false },
+    legend: {
+        position: 'bottom',
+        labels: { colors: '#94a3b8' },
+        fontSize: '11px',
+    },
+    plotOptions: {
+        pie: {
+            donut: {
+                size: '70%',
+                labels: {
+                    show: true,
+                    total: {
+                        show: true,
+                        label: 'Total',
+                        color: '#94a3b8',
+                        fontSize: '12px',
+                        formatter: w => w.globals.seriesTotals.reduce((a, b) => a + b, 0),
+                    }
+                }
+            }
+        }
+    },
+    tooltip: { theme: 'dark' },
+}))
+
+const donutSeries = computed(() => {
+    const b = props.branch_breakdown
+    return [b.deposit.count, b.withdraw.count, b.transfer.count]
 })
 
 /* ── Quick action links ── */
@@ -320,132 +409,75 @@ const txTypeBg = t => {
         ════════════════════════════════════════════ -->
         <template v-if="isManager">
 
-          <!-- ── Today's Transaction Breakdown ── -->
-          <div>
-            <div class="flex items-center justify-between mb-3">
-              <h2 class="text-sm font-semibold text-white">Today's Transaction Breakdown</h2>
-              <span class="text-xs text-slate-500">{{ branch_today_txns }} total transactions</span>
-            </div>
-            <div class="grid grid-cols-3 gap-3">
-              <!-- Deposit -->
-              <div class="bg-slate-900 border border-slate-700/60 rounded-2xl p-4">
-                <div class="flex items-center gap-2 mb-3">
-                  <div class="w-7 h-7 rounded-lg bg-emerald-900/40 border border-emerald-700/30 flex items-center justify-center">
-                    <i class="ti ti-arrow-down-right text-emerald-400 text-xs"></i>
-                  </div>
-                  <span class="text-xs font-semibold text-slate-300 uppercase tracking-wide">Deposits</span>
-                </div>
-                <p class="text-xl font-bold text-white">{{ fmtShort(branch_breakdown.deposit.count) }}</p>
-                <p class="text-sm text-emerald-400 font-medium mt-0.5">${{ fmt(branch_breakdown.deposit.amount) }}</p>
-                <div class="mt-3">
-                  <div class="h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                    <div class="h-full bg-emerald-500 rounded-full transition-all duration-700"
-                         :style="{ width: breakdownPct('deposit') + '%' }"></div>
-                  </div>
-                  <p class="text-[10px] text-slate-500 mt-1">{{ breakdownPct('deposit') }}% of today's volume</p>
-                </div>
-              </div>
+          <!-- ── Charts Row: 7-Day Trend + Type Donut ── -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-              <!-- Withdrawal -->
-              <div class="bg-slate-900 border border-slate-700/60 rounded-2xl p-4">
-                <div class="flex items-center gap-2 mb-3">
-                  <div class="w-7 h-7 rounded-lg bg-red-900/40 border border-red-700/30 flex items-center justify-center">
-                    <i class="ti ti-arrow-up-right text-red-400 text-xs"></i>
-                  </div>
-                  <span class="text-xs font-semibold text-slate-300 uppercase tracking-wide">Withdrawals</span>
-                </div>
-                <p class="text-xl font-bold text-white">{{ fmtShort(branch_breakdown.withdraw.count) }}</p>
-                <p class="text-sm text-red-400 font-medium mt-0.5">${{ fmt(branch_breakdown.withdraw.amount) }}</p>
-                <div class="mt-3">
-                  <div class="h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                    <div class="h-full bg-red-500 rounded-full transition-all duration-700"
-                         :style="{ width: breakdownPct('withdraw') + '%' }"></div>
-                  </div>
-                  <p class="text-[10px] text-slate-500 mt-1">{{ breakdownPct('withdraw') }}% of today's volume</p>
-                </div>
-              </div>
-
-              <!-- Transfer -->
-              <div class="bg-slate-900 border border-slate-700/60 rounded-2xl p-4">
-                <div class="flex items-center gap-2 mb-3">
-                  <div class="w-7 h-7 rounded-lg bg-indigo-900/40 border border-indigo-700/30 flex items-center justify-center">
-                    <i class="ti ti-arrows-right-left text-indigo-400 text-xs"></i>
-                  </div>
-                  <span class="text-xs font-semibold text-slate-300 uppercase tracking-wide">Transfers</span>
-                </div>
-                <p class="text-xl font-bold text-white">{{ fmtShort(branch_breakdown.transfer.count) }}</p>
-                <p class="text-sm text-indigo-400 font-medium mt-0.5">${{ fmt(branch_breakdown.transfer.amount) }}</p>
-                <div class="mt-3">
-                  <div class="h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                    <div class="h-full bg-indigo-500 rounded-full transition-all duration-700"
-                         :style="{ width: breakdownPct('transfer') + '%' }"></div>
-                  </div>
-                  <p class="text-[10px] text-slate-500 mt-1">{{ breakdownPct('transfer') }}% of today's volume</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ── Weekly Trend + Active Tills ── -->
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
-            <!-- 7-Day Trend -->
-            <div class="bg-slate-900 border border-slate-700/60 rounded-2xl overflow-hidden">
+            <!-- 7-Day Trend (ApexCharts) -->
+            <div class="lg:col-span-2 bg-slate-900 border border-slate-700/60 rounded-2xl overflow-hidden">
               <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
                 <div>
                   <h2 class="font-semibold text-white text-sm">7-Day Transaction Trend</h2>
-                  <p class="text-xs text-slate-500 mt-0.5">Branch-wide daily transaction count</p>
+                  <p class="text-xs text-slate-500 mt-0.5">Count (bars) · Volume in $ (line)</p>
                 </div>
                 <i class="ti ti-chart-bar text-[#C9A84C] text-lg"></i>
               </div>
-              <div class="px-5 pt-5 pb-4">
-                <div v-if="weekly_trend.length" class="flex items-end gap-2 h-24">
-                  <div v-for="day in weekly_trend" :key="day.date"
-                       class="flex-1 flex flex-col items-center gap-1 group">
-                    <!-- Bar -->
-                    <div class="relative w-full flex items-end justify-center"
-                         style="height: 72px">
-                      <div class="w-full rounded-t-md transition-all duration-500 relative"
-                           :class="day.is_today
-                               ? 'bg-[#C9A84C]'
-                               : 'bg-slate-700/80 group-hover:bg-slate-600'"
-                           :style="{ height: (day.count / maxTrendCount * 72) + 'px', minHeight: '3px' }">
-                        <!-- Tooltip on hover -->
-                        <div class="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap
-                                    bg-slate-800 border border-slate-700 rounded-md px-2 py-1
-                                    text-[10px] text-white font-medium opacity-0 group-hover:opacity-100
-                                    pointer-events-none transition-opacity z-10">
-                          {{ day.count }} txns
-                        </div>
-                      </div>
-                    </div>
-                    <!-- Label -->
-                    <span class="text-[10px] font-medium"
-                          :class="day.is_today ? 'text-[#C9A84C]' : 'text-slate-500'">
-                      {{ day.label }}
-                    </span>
-                  </div>
-                </div>
-                <div v-else class="h-24 flex items-center justify-center text-slate-600 text-sm">
+              <div class="px-2 py-3">
+                <VueApexCharts
+                  v-if="weekly_trend.length"
+                  type="bar"
+                  height="200"
+                  :options="trendChartOptions"
+                  :series="trendChartSeries"
+                />
+                <div v-else class="h-48 flex items-center justify-center text-slate-600 text-sm">
                   No transaction data yet
-                </div>
-                <!-- Legend -->
-                <div class="flex items-center gap-4 mt-3 pt-3 border-t border-slate-800">
-                  <div class="flex items-center gap-1.5">
-                    <div class="w-2.5 h-2.5 rounded-sm bg-[#C9A84C]"></div>
-                    <span class="text-[10px] text-slate-400">Today</span>
-                  </div>
-                  <div class="flex items-center gap-1.5">
-                    <div class="w-2.5 h-2.5 rounded-sm bg-slate-700"></div>
-                    <span class="text-[10px] text-slate-400">Previous days</span>
-                  </div>
-                  <span class="ml-auto text-[10px] text-slate-500">
-                    Peak: {{ Math.max(...(weekly_trend.map(d => d.count)), 0) }} txns/day
-                  </span>
                 </div>
               </div>
             </div>
 
+            <!-- Type Donut (ApexCharts) -->
+            <div class="bg-slate-900 border border-slate-700/60 rounded-2xl overflow-hidden">
+              <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+                <div>
+                  <h2 class="font-semibold text-white text-sm">Today's Breakdown</h2>
+                  <p class="text-xs text-slate-500 mt-0.5">By transaction type</p>
+                </div>
+                <i class="ti ti-chart-donut text-[#C9A84C] text-lg"></i>
+              </div>
+              <div class="px-2 py-1">
+                <VueApexCharts
+                  v-if="branch_today_txns > 0"
+                  type="donut"
+                  height="220"
+                  :options="donutOptions"
+                  :series="donutSeries"
+                />
+                <div v-else class="h-52 flex flex-col items-center justify-center text-slate-600">
+                  <i class="ti ti-chart-donut text-3xl mb-2"></i>
+                  <p class="text-sm">No transactions today</p>
+                </div>
+              </div>
+              <!-- Amount summary below donut -->
+              <div v-if="branch_today_txns > 0" class="px-5 pb-4 space-y-2">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="flex items-center gap-1.5 text-emerald-400"><span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>Deposits</span>
+                  <span class="text-slate-300 font-medium">${{ fmt(branch_breakdown.deposit.amount) }}</span>
+                </div>
+                <div class="flex items-center justify-between text-xs">
+                  <span class="flex items-center gap-1.5 text-red-400"><span class="w-2 h-2 rounded-full bg-red-500 inline-block"></span>Withdrawals</span>
+                  <span class="text-slate-300 font-medium">${{ fmt(branch_breakdown.withdraw.amount) }}</span>
+                </div>
+                <div class="flex items-center justify-between text-xs">
+                  <span class="flex items-center gap-1.5 text-indigo-400"><span class="w-2 h-2 rounded-full bg-indigo-500 inline-block"></span>Transfers</span>
+                  <span class="text-slate-300 font-medium">${{ fmt(branch_breakdown.transfer.amount) }}</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- ── Active Tills ── -->
+          <div>
             <!-- Active Tills -->
             <div class="bg-slate-900 border border-slate-700/60 rounded-2xl overflow-hidden">
               <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
