@@ -67,7 +67,13 @@ services:
       VITE_REVERB_PORT: 8080
       VITE_REVERB_SCHEME: http
 
-      MAIL_MAILER: log          # Change to smtp + Gmail creds for live mail
+      MAIL_MAILER: smtp
+      MAIL_HOST: smtp.gmail.com
+      MAIL_PORT: 587
+      MAIL_USERNAME: cfriin7@gmail.com
+      MAIL_PASSWORD: "sjen qsjx iwes wfis"
+      MAIL_FROM_ADDRESS: cfriin7@gmail.com
+      MAIL_FROM_NAME: "Gobaad Bank"
       BCRYPT_ROUNDS: 12
     networks:
       - gobaad_net
