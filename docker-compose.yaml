@@ -15,7 +15,7 @@ services:
       - build_data:/var/www/html/public/build
     depends_on:
       app:
-        condition: service_healthy   # wait until php-fpm is fully ready
+        condition: service_started   # 502 page handles timing; no deadlock
     networks:
       - gobaad_net
     restart: unless-stopped
@@ -76,13 +76,13 @@ services:
       MAIL_FROM_ADDRESS: cfriin7@gmail.com
       MAIL_FROM_NAME: "Gobaad Bank"
       BCRYPT_ROUNDS: 12
-    # PHP-FPM is ready when port 9000 is actually listening
+    # PHP-FPM is ready when its master process is running
     healthcheck:
-      test: ["CMD-SHELL", "php -r \"$fp=@fsockopen('127.0.0.1',9000,$e,$m,2);if(!$fp)exit(1);fclose($fp);\""]
+      test: ["CMD-SHELL", "pgrep -x php-fpm > /dev/null || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 20
-      start_period: 150s      # allow up to 2.5 min for composer + npm build on first run
+      retries: 30
+      start_period: 150s
     networks:
       - gobaad_net
     restart: unless-stopped
