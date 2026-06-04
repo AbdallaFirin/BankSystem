@@ -19,18 +19,6 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-use Illuminate\Support\Facades\Mail;
-
-Route::get('/send-test',function(){
-    mail::raw(
-        'This is Test Email',function($message){
-            $message->to('abdallasport12@gmail.com')
-            ->subject("Laravel Email Test");
-        });
-
-    return 'Test Email Sent Successfully';
-
-});
 
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\AuthController;
@@ -68,9 +56,13 @@ Route::middleware(['auth:staff'])->group(function () {
     Route::get('/staff/dashboard', function () {
         $staff = Auth::guard('staff')->user()->load('role', 'branch');
 
-        // Vault balance
+        // Vault balance — computed from ledger entries (accounts table has no balance column)
         $vault        = Account::where('account_number', 'VAULT-'.$staff->branch_id)->first();
-        $vaultBalance = $vault ? (float)$vault->balance : 0.0;
+        $vaultBalance = $vault
+            ? (float) \App\Models\LedgerEntry::where('account_id', $vault->id)
+                ->selectRaw("COALESCE(SUM(CASE WHEN entry_type='credit' THEN amount ELSE -amount END), 0) as bal")
+                ->value('bal')
+            : 0.0;
 
         // Today's transactions by this staff
         $todayTxns   = \App\Models\Transaction::where('initiated_by', $staff->id)
@@ -125,7 +117,8 @@ Route::middleware(['auth:staff'])->group(function () {
             ]);
 
         // ── Branch Manager analytics ──────────────────────────────────────────
-        $isBranchManager  = str_contains($staff->role?->role_name ?? '', 'Manager');
+        $isBranchManager  = ($staff->role?->role_name === 'Branch Manager');
+        // Keys match Vue component ('withdraw'); DB type is 'withdrawal' — mapped below
         $branchBreakdown  = [
             'deposit'  => ['count' => 0, 'amount' => 0.0],
             'withdraw' => ['count' => 0, 'amount' => 0.0],
@@ -163,10 +156,10 @@ Route::middleware(['auth:staff'])->group(function () {
                 ->selectRaw("type, COUNT(*) as cnt, COALESCE(SUM(amount),0) as amt")
                 ->groupBy('type')
                 ->get()->keyBy('type');
-            foreach (['deposit', 'withdraw', 'transfer'] as $t) {
-                $r = $typeRows->get($t);
-                $branchBreakdown[$t] = ['count' => (int)($r->cnt ?? 0), 'amount' => (float)($r->amt ?? 0)];
-            }
+            // DB stores type='withdrawal'; Vue key is 'withdraw' — map explicitly
+            $branchBreakdown['deposit']  = ['count' => (int)($typeRows->get('deposit')?->cnt    ?? 0), 'amount' => (float)($typeRows->get('deposit')?->amt    ?? 0)];
+            $branchBreakdown['withdraw'] = ['count' => (int)($typeRows->get('withdrawal')?->cnt  ?? 0), 'amount' => (float)($typeRows->get('withdrawal')?->amt  ?? 0)];
+            $branchBreakdown['transfer'] = ['count' => (int)($typeRows->get('transfer')?->cnt   ?? 0), 'amount' => (float)($typeRows->get('transfer')?->amt   ?? 0)];
 
             // 7-day trend (1 query)
             $trendRows = \App\Models\Transaction::where('branch_id', $staff->branch_id)

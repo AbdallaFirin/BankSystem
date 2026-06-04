@@ -18,36 +18,42 @@ class DatabaseSeeder extends Seeder
 
         // 1. Seed Branches
         $branchMain = DB::table('branches')->insertGetId([
-            'branch_name' => 'Mogadishu — Main Branch',
-            'city' => 'Mogadishu',
-            'address' => 'Makkah Al-Mukarramah Road',
-            'phone' => '+252 61 000 0001',
-            'status' => 'active',
-            'opened_at' => $now,
-            'created_at' => $now,
-            'updated_at' => $now,
+            'branch_name'   => 'Mogadishu — Main Branch',
+            'city'          => 'Mogadishu',
+            'address'       => 'Makkah Al-Mukarramah Road',
+            'phone'         => '+252 61 000 0001',
+            'branch_code'   => 'MGD',
+            'branch_number' => 101,
+            'status'        => 'active',
+            'opened_at'     => $now,
+            'created_at'    => $now,
+            'updated_at'    => $now,
         ]);
 
         $branchNugaal = DB::table('branches')->insertGetId([
-            'branch_name' => 'Garoowe — Nugaal Branch',
-            'city' => 'Garoowe',
-            'address' => 'Waberi District',
-            'phone' => '+252 61 000 0002',
-            'status' => 'active',
-            'opened_at' => $now,
-            'created_at' => $now,
-            'updated_at' => $now,
+            'branch_name'   => 'Garoowe — Nugaal Branch',
+            'city'          => 'Garoowe',
+            'address'       => 'Waberi District',
+            'phone'         => '+252 61 000 0002',
+            'branch_code'   => 'GRW',
+            'branch_number' => 102,
+            'status'        => 'active',
+            'opened_at'     => $now,
+            'created_at'    => $now,
+            'updated_at'    => $now,
         ]);
 
         $branchBari = DB::table('branches')->insertGetId([
-            'branch_name' => 'Bosaso — Bari Branch',
-            'city' => 'Bosaso',
-            'address' => 'Port Road',
-            'phone' => '+252 61 000 0003',
-            'status' => 'active',
-            'opened_at' => $now,
-            'created_at' => $now,
-            'updated_at' => $now,
+            'branch_name'   => 'Bosaso — Bari Branch',
+            'city'          => 'Bosaso',
+            'address'       => 'Port Road',
+            'phone'         => '+252 61 000 0003',
+            'branch_code'   => 'BSO',
+            'branch_number' => 103,
+            'status'        => 'active',
+            'opened_at'     => $now,
+            'created_at'    => $now,
+            'updated_at'    => $now,
         ]);
 
         // 2. Seed Roles

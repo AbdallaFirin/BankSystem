@@ -568,10 +568,29 @@ class AdminController extends Controller
         ]);
 
         $branch = Branch::findOrFail($id);
-        $branch->update(['manager_id' => $request->manager_id ?: null]);
 
-        $name = $request->manager_id
-            ? Staff::find($request->manager_id)->full_name
+        // Move the previous manager back to their original branch_id
+        // (set their branch_id back to whatever branch they were assigned to,
+        // but since we don't store "home branch" separately, we just leave them
+        // in the branch — they lose the manager role but keep the branch).
+        // More importantly: if the outgoing manager was scoped to THIS branch,
+        // they keep that branch_id; nothing needs to change for them.
+
+        // Move the new manager's branch_id to the branch they will manage
+        // so that all branch-scoped queries (BranchManagerController, middleware,
+        // etc.) resolve to the correct branch.
+        $newManagerId = $request->manager_id ?: null;
+
+        if ($newManagerId) {
+            $newManager = Staff::findOrFail($newManagerId);
+            // Update the staff member's branch_id to the managed branch
+            $newManager->update(['branch_id' => $branch->id]);
+        }
+
+        $branch->update(['manager_id' => $newManagerId]);
+
+        $name = $newManagerId
+            ? Staff::find($newManagerId)->full_name
             : 'unassigned';
 
         return back()->with('success', "Branch manager set to {$name}.");
