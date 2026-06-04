@@ -14,7 +14,8 @@ services:
       - vendor_data:/var/www/html/vendor
       - build_data:/var/www/html/public/build
     depends_on:
-      - app
+      app:
+        condition: service_healthy   # wait until php-fpm is fully ready
     networks:
       - gobaad_net
     restart: unless-stopped
@@ -75,6 +76,13 @@ services:
       MAIL_FROM_ADDRESS: cfriin7@gmail.com
       MAIL_FROM_NAME: "Gobaad Bank"
       BCRYPT_ROUNDS: 12
+    # PHP-FPM is ready when port 9000 is actually listening
+    healthcheck:
+      test: ["CMD-SHELL", "php -r \"$fp=@fsockopen('127.0.0.1',9000,$e,$m,2);if(!$fp)exit(1);fclose($fp);\""]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 150s      # allow up to 2.5 min for composer + npm build on first run
     networks:
       - gobaad_net
     restart: unless-stopped
@@ -122,7 +130,7 @@ services:
       mysql:
         condition: service_healthy
       app:
-        condition: service_started
+        condition: service_healthy
     environment:
       APP_KEY: base64:5k3EeWqEMkYtmEQhz01IRrfrpapKW3C7fporPBR6/aY=
       DB_HOST: mysql
