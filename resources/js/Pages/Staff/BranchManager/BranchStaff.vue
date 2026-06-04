@@ -118,7 +118,7 @@
                             class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
                                    bg-red-900/30 border border-red-700/40 text-red-400
                                    hover:bg-red-800/50 hover:text-white text-xs font-medium transition-colors">
-                      <i class="ti ti-trash text-sm"></i> Delete
+                      <i class="ti ti-user-off text-sm"></i> Deactivate
                     </button>
                   </div>
                 </td>
@@ -200,19 +200,20 @@
       </Transition>
     </Teleport>
 
-    <!-- ══════════ Delete Confirm Modal ══════════ -->
+    <!-- ══════════ Deactivate Confirm Modal ══════════ -->
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="deleteTarget"
              class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div class="bg-[#112236] border border-red-900/60 rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center space-y-4">
-            <div class="w-14 h-14 rounded-full bg-red-900/40 flex items-center justify-center mx-auto">
-              <i class="ti ti-trash text-2xl text-red-400"></i>
+          <div class="bg-[#112236] border border-amber-900/60 rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center space-y-4">
+            <div class="w-14 h-14 rounded-full bg-amber-900/40 flex items-center justify-center mx-auto">
+              <i class="ti ti-user-off text-2xl text-amber-400"></i>
             </div>
             <div>
-              <h3 class="font-semibold text-white text-base">Delete Staff Account?</h3>
+              <h3 class="font-semibold text-white text-base">Deactivate Staff Account?</h3>
               <p class="text-sm text-slate-400 mt-1">
-                This will permanently delete <strong class="text-white">{{ deleteTarget.full_name }}</strong>'s account. This cannot be undone.
+                <strong class="text-white">{{ deleteTarget.full_name }}</strong>'s account will be deactivated.
+                They will no longer be able to log in, but all their transaction history and audit records will be preserved.
               </p>
             </div>
             <div class="flex gap-3">
@@ -221,8 +222,8 @@
                 Cancel
               </button>
               <button @click="doDelete"
-                      class="flex-1 bg-red-700 hover:bg-red-600 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors">
-                Yes, Delete
+                      class="flex-1 bg-amber-700 hover:bg-amber-600 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors">
+                Yes, Deactivate
               </button>
             </div>
           </div>

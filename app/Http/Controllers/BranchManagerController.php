@@ -356,14 +356,19 @@ class BranchManagerController extends Controller
         $manager = Auth::guard('staff')->user();
 
         if ($id === $manager->id) {
-            return back()->withErrors(['error' => 'You cannot delete your own account.']);
+            return back()->withErrors(['error' => 'You cannot deactivate your own account.']);
         }
 
         $target = Staff::where('branch_id', $manager->branch_id)->findOrFail($id);
-        $name = $target->full_name;
-        $target->delete();
+        $name   = $target->full_name;
 
-        return back()->with('success', "{$name}'s account has been deleted.");
+        // Banking systems never hard-delete staff — staff may have initiated
+        // transactions, approved loans, and generated audit logs. Deleting
+        // a staff record would orphan all that history and violate FK constraints.
+        // Deactivate instead: the account becomes inaccessible but history is preserved.
+        $target->update(['status' => 'inactive']);
+
+        return back()->with('success', "{$name}'s account has been deactivated. Their history is preserved.");
     }
 
     /* ─────────────────────────────────────────────
