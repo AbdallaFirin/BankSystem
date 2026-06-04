@@ -126,6 +126,25 @@
       </div>
     </div>
 
+    <!-- ── 6-Month Spending Analytics ── -->
+    <div v-if="spending_data.length" class="mt-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <div>
+          <h2 class="font-bold text-slate-800">6-Month Spending Analytics</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Deposits, withdrawals and transfers by month</p>
+        </div>
+        <i class="ti ti-chart-bar text-[#0B1929] text-xl"></i>
+      </div>
+      <div class="px-2 py-3">
+        <VueApexCharts
+          type="bar"
+          height="220"
+          :options="spendingChartOptions"
+          :series="spendingChartSeries"
+        />
+      </div>
+    </div>
+
   </CustomerLayout>
 </template>
 
@@ -139,6 +158,7 @@ const props = defineProps({
   accounts:             { type: Array, default: () => [] },
   recent_transactions:  { type: Array, default: () => [] },
   unread_count:         { type: Number, default: 0 },
+  spending_data:        { type: Array, default: () => [] },
 })
 
 const page = usePage()
@@ -196,4 +216,32 @@ const flowChartSeries = computed(() => {
 const totalIn  = computed(() => props.recent_transactions.filter(t => t.sign === '+').reduce((s, t) => s + Number(t.amount), 0))
 const totalOut = computed(() => props.recent_transactions.filter(t => t.sign === '-').reduce((s, t) => s + Number(t.amount), 0))
 const netFlow  = computed(() => totalIn.value - totalOut.value)
+
+/* ── 6-Month Spending Analytics Chart ── */
+const spendingMonths = computed(() => props.spending_data.map(d => d.month))
+const spendingChartOptions = computed(() => ({
+  chart: { type: 'bar', height: 220, background: 'transparent', toolbar: { show: false } },
+  colors: ['#10b981', '#ef4444', '#f59e0b'],
+  plotOptions: { bar: { borderRadius: 3, columnWidth: '65%' } },
+  dataLabels: { enabled: false },
+  xaxis: {
+    categories: spendingMonths.value,
+    labels: { style: { colors: '#94a3b8', fontSize: '10px' } },
+    axisBorder: { show: false }, axisTicks: { show: false },
+  },
+  yaxis: {
+    labels: {
+      style: { colors: '#94a3b8', fontSize: '10px' },
+      formatter: v => v >= 1000 ? `$${(v/1000).toFixed(1)}k` : `$${v}`,
+    }
+  },
+  grid: { borderColor: '#f1f5f9', strokeDashArray: 3 },
+  legend: { show: true, labels: { colors: '#64748b' }, fontSize: '11px' },
+  tooltip: { y: { formatter: v => `$${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2 })}` } },
+}))
+const spendingChartSeries = computed(() => [
+  { name: 'Deposits',    data: props.spending_data.map(d => d.deposit) },
+  { name: 'Withdrawals', data: props.spending_data.map(d => d.withdrawal) },
+  { name: 'Transfers',   data: props.spending_data.map(d => d.transfer) },
+])
 </script>

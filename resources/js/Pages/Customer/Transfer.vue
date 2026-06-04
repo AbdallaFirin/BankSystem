@@ -119,6 +119,23 @@
         <!-- To Account — External -->
         <div v-if="transferType === 'external'">
           <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Recipient Account Number</label>
+
+          <!-- Beneficiary quick-select -->
+          <div v-if="beneficiaries.length" class="mb-2">
+            <p class="text-[11px] text-slate-400 mb-1.5 uppercase tracking-wider">Quick select from saved</p>
+            <div class="flex flex-wrap gap-1.5">
+              <button
+                v-for="b in beneficiaries" :key="b.id" type="button"
+                @click="selectBeneficiary(b)"
+                class="text-xs px-3 py-1.5 rounded-full border transition-colors"
+                :class="form.to_account_number === b.account_number
+                  ? 'bg-[#0B1929] border-[#0B1929] text-white'
+                  : 'border-slate-300 text-slate-600 hover:border-[#C9A84C] hover:text-[#0B1929]'">
+                <i class="ti ti-user mr-1"></i>{{ b.nickname }}
+              </button>
+            </div>
+          </div>
+
           <div class="relative">
             <input
               v-model="form.to_account_number"
@@ -239,7 +256,8 @@ import { useForm } from '@inertiajs/vue3'
 import CustomerLayout from '@/Layouts/CustomerLayout.vue'
 
 const props = defineProps({
-  accounts: { type: Array, default: () => [] },
+  accounts:      { type: Array, default: () => [] },
+  beneficiaries: { type: Array, default: () => [] },
 })
 
 const transferType = ref('own')
@@ -289,6 +307,12 @@ const exceedsBalance = computed(() => {
   if (!selectedFromAccount.value || enteredAmount.value <= 0) return false
   return enteredAmount.value > selectedFromAccount.value.balance
 })
+
+// ── Beneficiary quick-select ───────────────────
+function selectBeneficiary(b) {
+  form.to_account_number = b.account_number
+  lookupResult.value = { found: true, holder_name: b.account_holder_name }
+}
 
 // ── External account lookup ────────────────────
 const lookupResult = ref(null)

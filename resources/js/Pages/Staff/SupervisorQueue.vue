@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Head, router, usePage } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 
@@ -10,6 +10,30 @@ const props = defineProps({
 
 const page = usePage();
 
+/* ── Real-time pending transactions via Laravel Reverb ── */
+const liveQueue    = ref([...props.transactions])
+const newCount     = ref(0)       // badge counter for new live arrivals
+let   echoChannel  = null
+
+onMounted(() => {
+    const branchId = page.props.auth?.user?.branch_id
+    if (!branchId || !window.Echo) return
+
+    echoChannel = window.Echo
+        .channel(`branch.${branchId}.approvals`)
+        .listen('.transaction.pending', (data) => {
+            const tx = data.transaction
+            // Avoid duplicates (in case Inertia already loaded it)
+            if (liveQueue.value.some(t => t.id === tx.id)) return
+            liveQueue.value.unshift(tx)
+            newCount.value++
+        })
+})
+
+onUnmounted(() => {
+    if (echoChannel) window.Echo?.leave(echoChannel.name)
+})
+
 /* ── Active tab ── */
 const activeTab = ref('queue');
 
@@ -17,7 +41,7 @@ const activeTab = ref('queue');
 const selectedIds = ref(new Set());
 
 const allSelected = computed(() =>
-    props.transactions.length > 0 && selectedIds.value.size === props.transactions.length
+    liveQueue.length > 0 && selectedIds.value.size === liveQueue.length
 );
 
 function toggleSelect(id) {
@@ -30,7 +54,7 @@ function toggleSelectAll() {
     if (allSelected.value) {
         selectedIds.value = new Set();
     } else {
-        selectedIds.value = new Set(props.transactions.map(t => t.id));
+        selectedIds.value = new Set(liveQueue.value.map(t => t.id));
     }
 }
 
@@ -143,10 +167,20 @@ const typeIcon = {
         </div>
         <div class="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-sm">
           <span class="w-2 h-2 rounded-full shrink-0"
-                :class="transactions.length ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'"></span>
-          <span class="text-slate-300 font-medium">{{ transactions.length }} pending</span>
+                :class="liveQueue.length ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'"></span>
+          <span class="text-slate-300 font-medium">{{ liveQueue.length }} pending</span>
         </div>
       </div>
+
+      <!-- Live arrival toast -->
+      <Transition name="slide-down">
+        <div v-if="newCount > 0"
+             class="flex items-center gap-3 bg-amber-900/30 border border-amber-500/40 text-amber-300 rounded-xl px-5 py-3 text-sm">
+          <i class="ti ti-bell-ringing text-lg animate-bounce shrink-0"></i>
+          <span><strong>{{ newCount }} new transaction{{ newCount > 1 ? 's' : '' }}</strong> arrived in real time — shown at the top of the queue.</span>
+          <button @click="newCount = 0" class="ml-auto text-amber-400 hover:text-amber-200"><i class="ti ti-x"></i></button>
+        </div>
+      </Transition>
 
       <!-- Flash -->
       <div v-if="page.props.flash?.success"
@@ -167,9 +201,9 @@ const typeIcon = {
                     : 'text-slate-400 hover:text-slate-200'">
           <i class="ti ti-clock-hour-4"></i>
           Pending Queue
-          <span v-if="transactions.length"
+          <span v-if="liveQueue.length"
                 class="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white leading-none">
-            {{ transactions.length }}
+            {{ liveQueue.length }}
           </span>
         </button>
         <button @click="activeTab = 'history'; clearSelection()"
@@ -191,7 +225,7 @@ const typeIcon = {
       <div v-if="activeTab === 'queue'">
 
         <!-- Empty state -->
-        <div v-if="!transactions.length"
+        <div v-if="!liveQueue.length"
              class="bg-slate-900 border border-slate-700/60 rounded-2xl px-6 py-16 text-center">
           <div class="w-16 h-16 mx-auto rounded-full bg-emerald-500/10 flex items-center justify-center mb-4">
             <i class="ti ti-circle-check text-3xl text-emerald-400"></i>
@@ -217,7 +251,7 @@ const typeIcon = {
                 <i v-if="allSelected" class="ti ti-check text-[10px] text-white"></i>
                 <i v-else-if="selectedIds.size > 0" class="ti ti-minus text-[10px] text-amber-400"></i>
               </div>
-              {{ allSelected ? 'Deselect all' : `Select all (${transactions.length})` }}
+              {{ allSelected ? 'Deselect all' : `Select all (${liveQueue.length})` }}
             </button>
 
             <!-- Bulk action buttons — visible when something is selected -->
@@ -245,7 +279,7 @@ const typeIcon = {
           </div>
 
           <!-- Queue cards -->
-          <div v-for="tx in transactions" :key="tx.id"
+          <div v-for="tx in liveQueue" :key="tx.id"
                class="bg-slate-900 border rounded-2xl overflow-hidden transition"
                :class="selectedIds.has(tx.id)
                    ? 'border-amber-500/50 ring-1 ring-amber-500/20'

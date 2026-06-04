@@ -267,6 +267,18 @@ class AdminController extends Controller
         return back()->with('success', "Staff account for {$staff->full_name} is now {$newStatus}.");
     }
 
+    /** POST /staff/admin/staff/{id}/unlock — clear lockout */
+    public function unlockStaff($id)
+    {
+        $staff = Staff::findOrFail($id);
+        $staff->update([
+            'failed_attempts' => 0,
+            'locked_until'    => null,
+        ]);
+
+        return back()->with('success', "Account for {$staff->full_name} has been unlocked.");
+    }
+
     public function auditIndex()
     {
         $logs = \App\Models\StaffAuditLog::with(['staff', 'branch'])

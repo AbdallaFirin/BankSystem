@@ -306,9 +306,10 @@ const navLinks = [
   { route: 'customer.dashboard',    icon: 'ti ti-layout-dashboard',  label: 'Dashboard' },
   { route: 'customer.accounts',     icon: 'ti ti-credit-card',       label: 'My Accounts' },
   { route: 'customer.transactions', icon: 'ti ti-list',              label: 'Transactions' },
-  { route: 'customer.transfer',     icon: 'ti ti-arrows-right-left', label: 'Transfer' },
-  { route: 'customer.profile',      icon: 'ti ti-user-circle',       label: 'My Profile' },
-  { route: 'customer.reports',      icon: 'ti ti-file-analytics',    label: 'Reports' },
+  { route: 'customer.transfer',             icon: 'ti ti-arrows-right-left', label: 'Transfer' },
+  { route: 'customer.beneficiaries.index', icon: 'ti ti-users',             label: 'Beneficiaries' },
+  { route: 'customer.profile',             icon: 'ti ti-user-circle',       label: 'My Profile' },
+  { route: 'customer.reports',             icon: 'ti ti-file-analytics',    label: 'Reports' },
 ]
 
 const pageTitleMap = {

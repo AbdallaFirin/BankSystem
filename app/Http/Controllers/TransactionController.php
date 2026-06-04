@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Account;
 use App\Models\CashAllocation;
 use App\Models\Customer;
+use App\Events\PendingTransactionCreated;
 use App\Models\InterBranchClearing;
 use App\Models\PendingApproval;
 use App\Models\Role;
@@ -52,6 +53,26 @@ class TransactionController extends Controller
             'approver_role_id' => $supervisorRoleId,
             'status'           => 'pending',
         ]);
+
+        // Broadcast real-time to the supervisor approval queue
+        $typeLabelsMap = [
+            'deposit'    => 'Cash Deposit',
+            'withdrawal' => 'Cash Withdrawal',
+            'transfer'   => 'Inter-Account Transfer',
+        ];
+        try {
+            PendingTransactionCreated::dispatch([
+                'id'           => $transaction->id,
+                'reference'    => $transaction->reference,
+                'type'         => $transaction->type,
+                'type_label'   => $typeLabelsMap[$transaction->type] ?? ucfirst($transaction->type),
+                'amount'       => (float) $transaction->amount,
+                'initiated_by' => $staff->full_name,
+                'created_at'   => now()->toISOString(),
+            ], $staff->branch_id);
+        } catch (\Throwable) {
+            // Never fail a transaction because of a broadcast error
+        }
 
         // Notify all supervisors and branch managers in the same branch
         $supervisors = Staff::with('role')

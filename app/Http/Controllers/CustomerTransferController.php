@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Models\Account;
+use App\Models\Beneficiary;
 use App\Models\Transaction;
 use App\Models\LedgerEntry;
 use App\Services\NotificationService;
@@ -36,8 +37,13 @@ class CustomerTransferController extends Controller
                 'balance'        => $acc->balance,
             ]);
 
+        $beneficiaries = Beneficiary::where('customer_id', $customer->id)
+            ->orderBy('nickname')
+            ->get(['id', 'account_number', 'account_holder_name', 'nickname']);
+
         return Inertia::render('Customer/Transfer', [
-            'accounts' => $accounts,
+            'accounts'      => $accounts,
+            'beneficiaries' => $beneficiaries,
         ]);
     }
 

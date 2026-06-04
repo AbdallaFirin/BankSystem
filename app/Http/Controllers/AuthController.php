@@ -26,11 +26,42 @@ class AuthController extends Controller
         $identNumber = strtoupper(trim($request->staff_id));
         $credentials = ['ident_number' => $identNumber, 'password' => $request->password];
 
+        // Load staff first to check lockout before validating password
+        $staff = Staff::where('ident_number', $identNumber)->first();
+
+        // ── Account lockout check ─────────────────────────────────────────────
+        if ($staff && $staff->locked_until && now()->lessThan($staff->locked_until)) {
+            $remaining = now()->diffInMinutes($staff->locked_until, false);
+            return back()->withErrors([
+                'staff_id' => "Account locked after too many failed attempts. Try again in {$remaining} minute(s) or contact your administrator.",
+            ])->onlyInput('staff_id');
+        }
+
         if (!Auth::guard('staff')->validate($credentials)) {
+            if ($staff) {
+                $attempts = ($staff->failed_attempts ?? 0) + 1;
+                $updates  = ['failed_attempts' => $attempts];
+
+                if ($attempts >= 5) {
+                    $updates['locked_until'] = now()->addMinutes(15);
+                    // Notify Super Admin about the lockout
+                    $this->notifyAdminOfLockout($staff);
+                }
+
+                $staff->update($updates);
+
+                $left = max(0, 5 - $attempts);
+                $msg  = $attempts >= 5
+                    ? 'Account locked for 15 minutes after 5 failed attempts. An administrator has been notified.'
+                    : "Invalid Staff ID or password. {$left} attempt(s) remaining before lockout.";
+
+                return back()->withErrors(['staff_id' => $msg])->onlyInput('staff_id');
+            }
             return back()->withErrors(['staff_id' => 'Invalid Staff ID or password.'])->onlyInput('staff_id');
         }
 
-        $staff = Staff::where('ident_number', $identNumber)->first();
+        // Successful credential check — reset lockout counters
+        $staff->update(['failed_attempts' => 0, 'locked_until' => null]);
 
         // Block invited staff — they must accept their email invite first
         if ($staff->status === 'invited') {
@@ -169,9 +200,47 @@ class AuthController extends Controller
     /* ── Helpers ── */
     private function staffRedirect($user)
     {
+        // ── Password expiry check (90-day policy) ────────────────────────────
+        $changedAt = $user->password_changed_at;
+        $expired   = $changedAt && now()->diffInDays($changedAt) >= 90;
+        $neverSet  = is_null($changedAt) && !$user->force_password_change;
+
+        if ($expired) {
+            // Force password change — set the flag and redirect to profile
+            $user->update(['force_password_change' => true]);
+            return redirect()->route('staff.profile')
+                ->with('warning', 'Your password is 90 days old and must be changed now.');
+        }
+
         if ($user->role?->role_name === 'Super Admin') return redirect()->route('staff.admin.dashboard');
         if ($user->role?->role_name === 'Customer Care Officer') return redirect()->route('staff.customer-care.register');
         return redirect()->route('staff.dashboard');
+    }
+
+    private function notifyAdminOfLockout(Staff $staff): void
+    {
+        try {
+            $superAdmin = Staff::whereHas('role', fn($q) => $q->where('role_name', 'Super Admin'))
+                ->whereNotNull('email')
+                ->first();
+
+            if (!$superAdmin) return;
+
+            Mail::send([], [], function ($msg) use ($superAdmin, $staff) {
+                $msg->to($superAdmin->email)
+                    ->subject('⚠️ Staff Account Locked — Gobaad Bank')
+                    ->html(
+                        "<p>Hello {$superAdmin->full_name},</p>" .
+                        "<p>The staff account <strong>{$staff->ident_number}</strong> ({$staff->full_name}) " .
+                        "has been <strong>locked</strong> after 5 consecutive failed login attempts.</p>" .
+                        "<p>Time: " . now()->format('d M Y H:i:s') . "</p>" .
+                        "<p>Please review and unlock the account in the Staff Management section if appropriate.</p>" .
+                        "<br><p>— Gobaad Bank Security System</p>"
+                    );
+            });
+        } catch (\Throwable $e) {
+            Log::warning('Lockout notification failed', ['error' => $e->getMessage()]);
+        }
     }
 
     private function sendOtpMail(string $to, string $name, string $code, string $purpose): void

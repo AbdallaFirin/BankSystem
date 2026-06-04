@@ -114,6 +114,15 @@ const toggleStatus = (member) => {
     }
 }
 
+/* ── Unlock locked account ── */
+const unlockAccount = (member) => {
+    if (confirm(`Unlock account for ${member.full_name} and reset failed attempts?`)) {
+        useForm({}).post(route('staff.admin.staff.unlock', member.id))
+    }
+}
+
+const isLocked = (member) => member.locked_until && new Date(member.locked_until) > new Date()
+
 function roleTierColor(role) {
     const t = role?.tier ?? ''
     if (t === 'System')     return 'bg-[rgba(201,168,76,0.12)] text-[#C9A84C] border-[rgba(201,168,76,0.25)]'
@@ -260,7 +269,18 @@ function roleTierColor(role) {
             </div>
           </div>
 
-          <div class="mt-6 pt-4 border-t border-[#ffffff08] flex justify-between items-center gap-2">
+          <!-- Locked account banner -->
+          <div v-if="isLocked(member)"
+               class="mt-3 flex items-center gap-2 bg-red-900/20 border border-red-500/30 rounded-lg px-3 py-2">
+            <i class="ti ti-lock text-red-400 text-sm"></i>
+            <span class="text-xs text-red-400 font-semibold flex-1">Locked after failed attempts</span>
+            <button @click="unlockAccount(member)"
+                    class="text-[10px] px-2 py-0.5 rounded border border-red-400 text-red-400 hover:bg-red-400 hover:text-white transition font-bold uppercase">
+              Unlock
+            </button>
+          </div>
+
+          <div class="mt-4 pt-4 border-t border-[#ffffff08] flex justify-between items-center gap-2">
             <span class="text-[9px] px-2 py-0.5 rounded border uppercase font-bold tracking-wider shrink-0" :class="roleTierColor(member.role)">
               {{ member.role?.tier }}
             </span>

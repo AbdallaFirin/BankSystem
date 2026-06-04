@@ -55,6 +55,14 @@ const currentUser = computed(() => page.props.auth?.user ?? {});
 // Force password change flag
 const mustChangePassword = computed(() => !!page.props.auth?.user?.force_password_change);
 
+// Password expiry warning (show banner when ≤ 7 days remain)
+const passwordDaysLeft = computed(() => {
+    const changed = page.props.auth?.user?.password_changed_at;
+    if (!changed) return null;
+    const days = 90 - Math.floor((Date.now() - new Date(changed).getTime()) / 86400000);
+    return days <= 7 && days > 0 ? days : null;
+});
+
 // Sync Pinia with Inertia on every visit/mount + start idle tracker
 onMounted(() => {
     syncAuth()
@@ -695,6 +703,18 @@ const can = (permission) => {
 
       <!-- Scrollable Inner Content -->
       <main class="flex-1 overflow-y-auto">
+          <!-- Password expiry warning banner -->
+          <div v-if="passwordDaysLeft !== null"
+               class="mx-4 mt-4 flex items-center gap-3 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-xl px-4 py-3 text-sm">
+            <i class="ti ti-shield-exclamation text-lg shrink-0"></i>
+            <span class="flex-1">
+              Your password expires in <strong>{{ passwordDaysLeft }} day{{ passwordDaysLeft === 1 ? '' : 's' }}</strong>.
+              Change it now to avoid being locked out.
+            </span>
+            <Link :href="route('staff.profile')" class="text-xs font-bold underline hover:text-amber-300 transition whitespace-nowrap">
+              Change Now
+            </Link>
+          </div>
           <slot />
       </main>
     </div>

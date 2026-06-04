@@ -39,10 +39,33 @@ class CustomerPortalController extends Controller
 
         $unreadCount = $customer->unreadNotificationsCount();
 
+        // ── Spending analytics — last 6 months by type ──────────────────────
+        $spendingData = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $month  = now()->subMonths($i);
+            $label  = $month->format('M Y');
+
+            $rows = Transaction::whereIn('account_id', $accountIds)
+                ->whereIn('status', ['completed', 'approved'])
+                ->whereYear('created_at',  $month->year)
+                ->whereMonth('created_at', $month->month)
+                ->selectRaw("type, COALESCE(SUM(amount), 0) as total")
+                ->groupBy('type')
+                ->pluck('total', 'type');
+
+            $spendingData[] = [
+                'month'      => $label,
+                'deposit'    => (float) ($rows['deposit']    ?? 0),
+                'withdrawal' => (float) ($rows['withdrawal'] ?? 0),
+                'transfer'   => (float) ($rows['transfer']   ?? 0),
+            ];
+        }
+
         return Inertia::render('Customer/Dashboard', [
             'accounts'            => $customer->accounts->map(fn($acc) => $this->formatAccount($acc)),
             'recent_transactions' => $recentTransactions,
             'unread_count'        => $unreadCount,
+            'spending_data'       => $spendingData,
         ]);
     }
 

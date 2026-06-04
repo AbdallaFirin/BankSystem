@@ -122,8 +122,11 @@ class StaffProfileController extends Controller
 
         $staff->update([
             'password'              => Hash::make($request->new_password),
-            'force_password_change' => false,   // clear the first-login flag
-            'temp_password'         => null,    // wipe the plain-text temp copy
+            'force_password_change' => false,
+            'temp_password'         => null,
+            'password_changed_at'   => now(),   // reset 90-day expiry clock
+            'failed_attempts'       => 0,       // clear any failed attempts on password change
+            'locked_until'          => null,
         ]);
 
         return back()->with('success', 'Password changed successfully. Keep it safe!');

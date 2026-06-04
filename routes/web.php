@@ -403,6 +403,7 @@ Route::middleware(['auth:staff'])->group(function () {
         Route::put(  '/staff/admin/staff/{id}',              [\App\Http\Controllers\AdminController::class, 'updateStaff']      )->name('staff.admin.staff.update');
         Route::post( '/staff/admin/staff/{id}/status',       [\App\Http\Controllers\AdminController::class, 'updateStaffStatus'])->name('staff.admin.staff.status');
         Route::post( '/staff/admin/staff/{id}/reset-password',[\App\Http\Controllers\AdminController::class, 'resetStaffPassword'])->name('staff.admin.staff.reset-password');
+        Route::post( '/staff/admin/staff/{id}/unlock',       [\App\Http\Controllers\AdminController::class, 'unlockStaff'])->name('staff.admin.staff.unlock');
 
         // Settings
         Route::get(  '/staff/admin/settings',                   [\App\Http\Controllers\AdminController::class, 'settingsIndex']          )->name('staff.admin.settings.index');
@@ -471,4 +472,10 @@ Route::middleware(['auth:customers', \App\Http\Middleware\EnsureCustomerAuthenti
         Route::post('/deposit',                 [\App\Http\Controllers\CustomerBankingController::class, 'submitDeposit'])->name('deposit.post');
         Route::get('/withdraw',                 [\App\Http\Controllers\CustomerBankingController::class, 'showWithdraw'])->name('withdraw');
         Route::post('/withdraw',                [\App\Http\Controllers\CustomerBankingController::class, 'submitWithdraw'])->name('withdraw.post');
+
+        // Beneficiary management
+        Route::get(   '/beneficiaries',      [\App\Http\Controllers\CustomerBeneficiaryController::class, 'index']  )->name('beneficiaries.index');
+        Route::post(  '/beneficiaries',      [\App\Http\Controllers\CustomerBeneficiaryController::class, 'store']  )->name('beneficiaries.store');
+        Route::delete('/beneficiaries/{id}', [\App\Http\Controllers\CustomerBeneficiaryController::class, 'destroy'])->name('beneficiaries.destroy');
+        Route::get(   '/beneficiaries/list', [\App\Http\Controllers\CustomerBeneficiaryController::class, 'list']   )->name('beneficiaries.list');
     });
