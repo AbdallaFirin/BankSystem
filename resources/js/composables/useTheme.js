@@ -6,8 +6,10 @@ const isDark = ref(true)
 function applyTheme(dark) {
     if (dark) {
         document.documentElement.classList.remove('light-mode')
+        document.documentElement.classList.add('dark-customer')    // customer portal dark
     } else {
         document.documentElement.classList.add('light-mode')
+        document.documentElement.classList.remove('dark-customer') // customer portal light
     }
     localStorage.setItem('gb_theme', dark ? 'dark' : 'light')
 }

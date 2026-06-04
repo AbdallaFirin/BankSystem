@@ -70,3 +70,73 @@ html.light-mode ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 .theme-toggle-btn {
     transition: all 0.2s ease;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   CUSTOMER PORTAL — DARK MODE
+   Applied when <html class="dark-customer"> is set.
+   The customer portal uses standard Tailwind slate/white classes
+   (not dark hex colors) so needs its own separate overrides.
+   Sidebar (<aside>) stays dark — it's already dark by design.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Page & card backgrounds ─────────────────────────────────── */
+html.dark-customer body                          { background-color: #0B1929 !important; }
+html.dark-customer .bg-slate-100                 { background-color: #0B1929 !important; }
+html.dark-customer .bg-white:not(aside):not(aside *) { background-color: #112236 !important; }
+html.dark-customer .bg-slate-50                  { background-color: #0d1f30 !important; }
+html.dark-customer .bg-slate-200                 { background-color: #1a3050 !important; }
+
+/* ── Text ────────────────────────────────────────────────────── */
+html.dark-customer .text-slate-800 { color: #f1f5f9 !important; }
+html.dark-customer .text-slate-700 { color: #e2e8f0 !important; }
+html.dark-customer .text-slate-600 { color: #cbd5e1 !important; }
+html.dark-customer .text-slate-500 { color: #94a3b8 !important; }
+html.dark-customer .text-slate-400 { color: #64748b !important; }
+
+/* ── Borders & dividers ──────────────────────────────────────── */
+html.dark-customer .border-slate-200 { border-color: #1e3a5f !important; }
+html.dark-customer .border-slate-100 { border-color: #162b40 !important; }
+html.dark-customer .border-slate-300 { border-color: #1e3a5f !important; }
+html.dark-customer .divide-slate-100 > * + * { border-color: #162b40 !important; }
+html.dark-customer .divide-slate-200 > * + * { border-color: #1e3a5f !important; }
+
+/* ── Inputs & selects ────────────────────────────────────────── */
+html.dark-customer input:not([class*="#"]):not([class*="bg-"]),
+html.dark-customer select:not([class*="#"]):not([class*="bg-"]),
+html.dark-customer textarea:not([class*="#"]):not([class*="bg-"]) {
+    background-color: #0d1f30 !important;
+    color: #f1f5f9 !important;
+    border-color: #1e3a5f !important;
+}
+html.dark-customer .border-slate-300 input,
+html.dark-customer input.border-slate-300 {
+    border-color: #1e3a5f !important;
+}
+
+/* ── Top header bar ──────────────────────────────────────────── */
+html.dark-customer header.bg-white { background-color: #112236 !important; }
+html.dark-customer header.border-slate-200 { border-color: #1e3a5f !important; }
+
+/* ── Footer ──────────────────────────────────────────────────── */
+html.dark-customer footer.bg-white { background-color: #112236 !important; }
+html.dark-customer footer.border-slate-200 { border-color: #1e3a5f !important; }
+html.dark-customer footer .text-slate-400 { color: #475569 !important; }
+
+/* ── Flash message backgrounds ───────────────────────────────── */
+html.dark-customer .bg-emerald-50  { background-color: rgba(16,185,129,0.1) !important; }
+html.dark-customer .bg-red-50      { background-color: rgba(239,68,68,0.1)  !important; }
+html.dark-customer .bg-blue-50     { background-color: rgba(59,130,246,0.1) !important; }
+html.dark-customer .bg-amber-50    { background-color: rgba(245,158,11,0.1) !important; }
+
+/* ── Hover states ────────────────────────────────────────────── */
+html.dark-customer .hover\:bg-slate-50:hover  { background-color: #0d1f30 !important; }
+html.dark-customer .hover\:bg-slate-100:hover { background-color: #1a3050 !important; }
+
+/* ── Shadows ─────────────────────────────────────────────────── */
+html.dark-customer .shadow-sm  { box-shadow: 0 1px 2px rgba(0,0,0,0.4) !important; }
+html.dark-customer .shadow-md  { box-shadow: 0 4px 6px rgba(0,0,0,0.4) !important; }
+
+/* ── Scrollbar (dark mode) ───────────────────────────────────── */
+html.dark-customer ::-webkit-scrollbar-track { background: #0B1929; }
+html.dark-customer ::-webkit-scrollbar-thumb { background: #1e3a5f; }
+html.dark-customer ::-webkit-scrollbar-thumb:hover { background: #2a4a6f; }
