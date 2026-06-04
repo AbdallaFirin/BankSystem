@@ -50,10 +50,12 @@ if grep -q "APP_KEY=$" .env 2>/dev/null || ! grep -q "^APP_KEY=base64:" .env 2>/
 fi
 
 # ── 5. Storage symlink ────────────────────────────────────────────────────────
-if [ ! -L public/storage ]; then
-    echo "🔗  Creating storage symlink..."
-    php artisan storage:link
-fi
+# Always recreate — Windows-created symlinks point to the host absolute path
+# (/mnt/host/c/Users/...) which is unreachable inside the Linux container.
+echo "🔗  Recreating storage symlink..."
+rm -f public/storage
+ln -sfn /var/www/html/storage/app/public public/storage
+echo "✓  Storage symlink → /var/www/html/storage/app/public"
 
 # ── 6. Set permissions ────────────────────────────────────────────────────────
 chown -R www-data:www-data storage bootstrap/cache public/build 2>/dev/null || true
