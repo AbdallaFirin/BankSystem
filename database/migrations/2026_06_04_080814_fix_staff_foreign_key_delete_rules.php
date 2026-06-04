@@ -21,67 +21,51 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // staff_audit_logs.staff_id
-        Schema::table('staff_audit_logs', function (Blueprint $table) {
-            $table->dropForeign(['staff_id']);
-            $table->unsignedBigInteger('staff_id')->nullable()->change();
-            $table->foreign('staff_id')->references('id')->on('staff')->nullOnDelete();
-        });
+        // On a fresh database the original migrations already created these
+        // columns as nullable with no FK, or with a different constraint name.
+        // We use try/catch so the migration is idempotent: if the FK doesn't
+        // exist (fresh install) we skip the drop and just re-declare it as
+        // SET NULL; if it does exist (existing install) we replace it.
+        $changes = [
+            'staff_audit_logs'   => 'staff_id',
+            'transactions'       => 'initiated_by',
+            'account_freeze_logs'=> 'performed_by',
+            'customers'          => 'registered_by',
+            'kyc_documents'      => 'verified_by',
+        ];
 
-        // transactions.initiated_by
-        Schema::table('transactions', function (Blueprint $table) {
-            $table->dropForeign(['initiated_by']);
-            $table->unsignedBigInteger('initiated_by')->nullable()->change();
-            $table->foreign('initiated_by')->references('id')->on('staff')->nullOnDelete();
-        });
+        foreach ($changes as $tableName => $column) {
+            Schema::table($tableName, function (Blueprint $table) use ($column) {
+                // Drop existing FK if present (ignore if it doesn't exist)
+                try { $table->dropForeign([$column]); } catch (\Throwable $e) {}
+                $table->unsignedBigInteger($column)->nullable()->change();
+                // Re-add with SET NULL so staff deletion doesn't crash
+                try {
+                    $table->foreign($column)->references('id')->on('staff')->nullOnDelete();
+                } catch (\Throwable $e) {}
+            });
+        }
 
-        // pending_approvals.requested_by
+        // pending_approvals — two columns
         Schema::table('pending_approvals', function (Blueprint $table) {
-            $table->dropForeign(['requested_by']);
-            $table->unsignedBigInteger('requested_by')->nullable()->change();
-            $table->foreign('requested_by')->references('id')->on('staff')->nullOnDelete();
+            foreach (['requested_by', 'decided_by'] as $col) {
+                try { $table->dropForeign([$col]); } catch (\Throwable $e) {}
+                $table->unsignedBigInteger($col)->nullable()->change();
+                try {
+                    $table->foreign($col)->references('id')->on('staff')->nullOnDelete();
+                } catch (\Throwable $e) {}
+            }
         });
 
-        // pending_approvals.decided_by
-        Schema::table('pending_approvals', function (Blueprint $table) {
-            $table->dropForeign(['decided_by']);
-            $table->unsignedBigInteger('decided_by')->nullable()->change();
-            $table->foreign('decided_by')->references('id')->on('staff')->nullOnDelete();
-        });
-
-        // account_freeze_logs.performed_by
-        Schema::table('account_freeze_logs', function (Blueprint $table) {
-            $table->dropForeign(['performed_by']);
-            $table->unsignedBigInteger('performed_by')->nullable()->change();
-            $table->foreign('performed_by')->references('id')->on('staff')->nullOnDelete();
-        });
-
-        // customers.registered_by
-        Schema::table('customers', function (Blueprint $table) {
-            $table->dropForeign(['registered_by']);
-            $table->unsignedBigInteger('registered_by')->nullable()->change();
-            $table->foreign('registered_by')->references('id')->on('staff')->nullOnDelete();
-        });
-
-        // kyc_documents.verified_by
-        Schema::table('kyc_documents', function (Blueprint $table) {
-            $table->dropForeign(['verified_by']);
-            $table->unsignedBigInteger('verified_by')->nullable()->change();
-            $table->foreign('verified_by')->references('id')->on('staff')->nullOnDelete();
-        });
-
-        // loans.approved_by
+        // loans — two columns
         Schema::table('loans', function (Blueprint $table) {
-            $table->dropForeign(['approved_by']);
-            $table->unsignedBigInteger('approved_by')->nullable()->change();
-            $table->foreign('approved_by')->references('id')->on('staff')->nullOnDelete();
-        });
-
-        // loans.reviewed_by
-        Schema::table('loans', function (Blueprint $table) {
-            $table->dropForeign(['reviewed_by']);
-            $table->unsignedBigInteger('reviewed_by')->nullable()->change();
-            $table->foreign('reviewed_by')->references('id')->on('staff')->nullOnDelete();
+            foreach (['approved_by', 'reviewed_by'] as $col) {
+                try { $table->dropForeign([$col]); } catch (\Throwable $e) {}
+                $table->unsignedBigInteger($col)->nullable()->change();
+                try {
+                    $table->foreign($col)->references('id')->on('staff')->nullOnDelete();
+                } catch (\Throwable $e) {}
+            }
         });
     }
 
