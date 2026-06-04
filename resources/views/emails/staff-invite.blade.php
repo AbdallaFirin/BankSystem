@@ -29,7 +29,15 @@
 <div class="wrapper">
 
   <div class="header">
-    <img src="{{ asset('images/MAin Logo.png') }}" alt="Gobaad Bank" />
+    @php
+      $logoPath = public_path('images/MAin Logo.png');
+      $logoSrc  = file_exists($logoPath)
+          ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath))
+          : '';
+    @endphp
+    @if($logoSrc)
+      <img src="{{ $logoSrc }}" alt="Gobaad Bank" />
+    @endif
     <h1>GOBAAD BANK</h1>
   </div>
 
