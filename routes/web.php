@@ -42,6 +42,10 @@ Route::post('/forgot-password', [AuthController::class, 'sendResetOtp'])->name('
 Route::get('/reset-password',   [AuthController::class, 'showResetPassword'])->name('staff.reset-password');
 Route::post('/reset-password',  [AuthController::class, 'resetPassword'])->name('staff.reset-password.confirm');
 
+// Staff Invite Accept (no auth required — new staff haven't logged in yet)
+Route::get( '/staff/accept-invite', [AuthController::class, 'showAcceptInvite'])->name('staff.accept-invite');
+Route::post('/staff/accept-invite', [AuthController::class, 'acceptInvite'])->name('staff.accept-invite.post');
+
 Route::get('/error/403', function () {
     return \Inertia\Inertia::render('Errors/403');
 })->name('error.403');

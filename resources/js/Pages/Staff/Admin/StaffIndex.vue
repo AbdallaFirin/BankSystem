@@ -180,6 +180,7 @@ function roleTierColor(role) {
                 class="bg-[#0B1929] border border-[#ffffff14] text-[#A9B8C6] text-sm rounded-xl px-4 py-2.5 focus:border-[#C9A84C] outline-none transition">
           <option value="">All Statuses</option>
           <option value="active">Active</option>
+          <option value="invited">Invited (Pending)</option>
           <option value="inactive">Inactive</option>
         </select>
 
@@ -252,8 +253,9 @@ function roleTierColor(role) {
             </div>
             <div class="flex items-center gap-3 text-xs">
               <i class="ti ti-activity w-4 text-[#A9B8C6]"></i>
-              <span class="capitalize font-medium" :class="member.status === 'active' ? 'text-[#4CAF7D]' : 'text-[#E2635A]'">
-                {{ member.status }}
+              <span class="capitalize font-medium"
+                :class="member.status === 'active' ? 'text-[#4CAF7D]' : member.status === 'invited' ? 'text-[#C9A84C]' : 'text-[#E2635A]'">
+                {{ member.status === 'invited' ? 'Invited — Pending' : member.status }}
               </span>
             </div>
           </div>
@@ -410,18 +412,24 @@ function roleTierColor(role) {
               </div>
             </div>
 
-            <div class="flex flex-col gap-2">
-              <label class="text-[11px] text-[#C9A84C] font-bold uppercase tracking-widest">Initial Password</label>
-              <input v-model="form.password" type="password" required minlength="8"
-                     class="bg-white/5 border border-white/10 rounded-xl p-4 text-[#F0EBE1] outline-none focus:border-[#C9A84C] transition" />
-              <p class="text-[10px] text-[#6B7E8E]">Minimum 8 characters. Staff can change after first login.</p>
-              <p v-if="form.errors.password" class="text-xs text-[#E2635A]">{{ form.errors.password }}</p>
+            <!-- Invite info note — replaces password field -->
+            <div class="bg-[rgba(201,168,76,0.07)] border border-[#C9A84C]/20 rounded-xl p-4 flex gap-3">
+              <i class="ti ti-mail-forward text-[#C9A84C] text-lg shrink-0 mt-0.5"></i>
+              <div>
+                <p class="text-sm font-semibold text-[#C9A84C] mb-0.5">Invite by Email</p>
+                <p class="text-xs text-[#7a9ab5] leading-relaxed">
+                  An invitation email will be sent to the staff member's email address.
+                  They will set their own password when they accept the invite.
+                  The account stays <strong class="text-[#C9A84C]">pending</strong> until they accept.
+                </p>
+              </div>
             </div>
 
             <div class="pt-2">
               <button type="submit" :disabled="form.processing || !previewId"
-                      class="w-full bg-[#C9A84C] text-[#0B1929] font-bold py-4 rounded-xl hover:bg-[#E5C97E] transition disabled:opacity-40">
-                Initialize Staff Account
+                      class="w-full bg-[#C9A84C] text-[#0B1929] font-bold py-4 rounded-xl hover:bg-[#E5C97E] transition disabled:opacity-40 flex items-center justify-center gap-2">
+                <i class="ti ti-send"></i>
+                Send Invite &amp; Create Account
                 <span v-if="previewId" class="ml-2 opacity-70">(ID: {{ previewId }})</span>
               </button>
             </div>

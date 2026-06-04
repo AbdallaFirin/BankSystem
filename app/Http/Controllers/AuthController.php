@@ -32,6 +32,16 @@ class AuthController extends Controller
 
         $staff = Staff::where('ident_number', $identNumber)->first();
 
+        // Block invited staff — they must accept their email invite first
+        if ($staff->status === 'invited') {
+            return back()->withErrors(['staff_id' => 'Your account is pending activation. Please check your email for the invite link.'])->onlyInput('staff_id');
+        }
+
+        // Block inactive/suspended accounts
+        if ($staff->status === 'inactive') {
+            return back()->withErrors(['staff_id' => 'Your account has been deactivated. Contact your administrator.'])->onlyInput('staff_id');
+        }
+
         if (!$staff->email) {
             Auth::guard('staff')->attempt($credentials);
             $request->session()->regenerate();
@@ -210,5 +220,54 @@ class AuthController extends Controller
     {
         $request->user()->currentAccessToken()->delete();
         return response()->json(['message' => 'Logged out successfully']);
+    }
+
+    /* ────────────────────────────────────────────────────────
+     *  Staff Invite Accept Flow
+     *  GET  /staff/accept-invite?token=xxx  → show form
+     *  POST /staff/accept-invite             → set password & activate
+     * ──────────────────────────────────────────────────────── */
+    public function showAcceptInvite(Request $request)
+    {
+        $token = $request->query('token');
+        $staff = Staff::where('temp_password', $token)->where('status', 'invited')->first();
+
+        if (!$staff) {
+            return redirect()->route('login')
+                ->withErrors(['staff_id' => 'This invite link is invalid or has already been used.']);
+        }
+
+        return Inertia::render('Auth/AcceptInvite', [
+            'token'      => $token,
+            'staff_name' => $staff->full_name,
+            'staff_id'   => $staff->ident_number,
+            'role'       => $staff->role?->role_name,
+            'branch'     => $staff->branch?->branch_name,
+        ]);
+    }
+
+    public function acceptInvite(Request $request)
+    {
+        $request->validate([
+            'token'                 => 'required|string',
+            'password'              => 'required|min:8|confirmed',
+            'password_confirmation' => 'required',
+        ]);
+
+        $staff = Staff::where('temp_password', $request->token)->where('status', 'invited')->first();
+
+        if (!$staff) {
+            return back()->withErrors(['token' => 'This invite link is invalid or has already been used.']);
+        }
+
+        $staff->update([
+            'password'              => Hash::make($request->password),
+            'status'                => 'active',
+            'force_password_change' => false,
+            'temp_password'         => null,
+        ]);
+
+        return redirect()->route('login')
+            ->with('success', 'Your account is now active. Please log in with your Staff ID: ' . $staff->ident_number);
     }
 }

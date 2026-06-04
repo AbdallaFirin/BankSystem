@@ -167,19 +167,25 @@ class DatabaseSeeder extends Seeder
             'updated_at' => $now,
         ]);
 
-        // 5. Seed Super Admin Staff
+        // 5. Seed Super Admin Staff (and sample branch staff with full contact data)
         DB::table('staff')->updateOrInsert(
             ['ident_number' => 'ADM-001'],
             [
-                'full_name'    => 'System Administrator',
-                'email'        => 'abdallasport12@gmail.com',
-                'ident_number' => 'ADM-001',
-                'password'     => Hash::make('password'),
-                'role_id'      => $superAdminRoleId,
-                'branch_id'    => $branchMain,
-                'status'       => 'active',
-                'created_at'   => $now,
-                'updated_at'   => $now,
+                'full_name'         => 'System Administrator',
+                'email'             => 'abdallasport12@gmail.com',
+                'phone'             => '+252 61 100 0001',
+                'gender'            => 'Male',
+                'date_of_birth'     => '1985-03-15',
+                'address'           => 'Makkah Al-Mukarramah Road, Mogadishu',
+                'emergency_contact' => '+252 61 200 0001',
+                'ident_number'      => 'ADM-001',
+                'password'          => Hash::make('password'),
+                'role_id'           => $superAdminRoleId,
+                'branch_id'         => $branchMain,
+                'status'            => 'active',
+                'hired_at'          => $now,
+                'created_at'        => $now,
+                'updated_at'        => $now,
             ]
         );
         

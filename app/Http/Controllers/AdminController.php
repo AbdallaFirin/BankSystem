@@ -50,13 +50,23 @@ class AdminController extends Controller
             ->orderBy('role_id')
             ->get();
 
-        $roles = \App\Models\Role::all();
-        $branches = Branch::all();
+        // Only a Super Admin can assign the Super Admin role;
+        // everyone else sees all roles except Super Admin and System Admin.
+        $currentStaff = \Illuminate\Support\Facades\Auth::guard('staff')->user();
+        $isSuperAdmin = $currentStaff?->role?->role_name === 'Super Admin';
+
+        $roles = \App\Models\Role::when(!$isSuperAdmin, fn($q) =>
+                $q->whereNotIn('role_name', ['Super Admin', 'System Admin'])
+            )
+            ->orderBy('role_name')
+            ->get(['id', 'role_name']);
+
+        $branches = Branch::orderBy('branch_name')->get();
 
         return \Inertia\Inertia::render('Staff/Admin/StaffIndex', [
-            'staff' => $staff,
-            'roles' => $roles,
-            'branches' => $branches
+            'staff'   => $staff,
+            'roles'   => $roles,
+            'branches'=> $branches,
         ]);
     }
 
@@ -87,27 +97,44 @@ class AdminController extends Controller
             'full_name' => 'required|string|max:255',
             'email'     => 'required|email|unique:staff,email',
             'phone'     => 'required|string|unique:staff,phone',
-            'password'  => 'required|min:8',
             'role_id'   => 'required|exists:roles,id',
             'branch_id' => 'required|exists:branches,id',
         ]);
 
-        $staffId = $this->generateStaffId((int)$request->branch_id);
+        // Prevent non-Super-Admins from assigning privileged system roles
+        $assigner    = \Illuminate\Support\Facades\Auth::guard('staff')->user();
+        $targetRole  = \App\Models\Role::findOrFail($request->role_id);
+        $systemRoles = ['Super Admin', 'System Admin'];
+        if (in_array($targetRole->role_name, $systemRoles) && $assigner?->role?->role_name !== 'Super Admin') {
+            return back()->withErrors(['role_id' => 'Only a Super Admin can assign the ' . $targetRole->role_name . ' role.']);
+        }
 
-        Staff::create([
+        $staffId     = $this->generateStaffId((int)$request->branch_id);
+        $inviteToken = \Illuminate\Support\Str::uuid()->toString();
+
+        $newStaff = Staff::create([
             'full_name'             => $request->full_name,
             'email'                 => $request->email,
             'phone'                 => $request->phone,
-            'password'              => \Illuminate\Support\Facades\Hash::make($request->password),
+            'password'              => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(32)),
             'role_id'               => $request->role_id,
             'branch_id'             => $request->branch_id,
             'ident_number'          => $staffId,
-            'status'                => 'active',
+            'status'                => 'invited',
             'force_password_change' => true,
-            'temp_password'         => $request->password,   // plain-text; wiped on first self-change
+            'temp_password'         => $inviteToken,   // stores invite token until accepted
         ]);
 
-        return back()->with('success', "Staff account for {$request->full_name} created. Login ID: {$staffId}");
+        // Send invite email
+        try {
+            \Illuminate\Support\Facades\Mail::to($newStaff->email)
+                ->send(new \App\Mail\StaffInviteMail($newStaff, $inviteToken));
+            $msg = "Staff account for {$request->full_name} created (ID: {$staffId}). Invite email sent to {$newStaff->email}.";
+        } catch (\Exception $e) {
+            $msg = "Staff account for {$request->full_name} created (ID: {$staffId}). Invite email could not be sent — check mail config.";
+        }
+
+        return back()->with('success', $msg);
     }
 
     /**

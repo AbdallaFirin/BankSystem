@@ -19,9 +19,13 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->alias([
-            'permission' => \App\Http\Middleware\CheckPermission::class,
+            'permission'   => \App\Http\Middleware\CheckPermission::class,
             'branch.scope' => \App\Http\Middleware\BranchScopeMiddleware::class,
+            'audit'        => \App\Http\Middleware\AuditLogger::class,
         ]);
+
+        // Automatically audit all mutating staff requests
+        $middleware->appendToGroup('web', \App\Http\Middleware\AuditLogger::class);
 
         // When an already-authenticated customer hits a guest:customers route,
         // send them to the customer dashboard — NOT the staff login page.
