@@ -283,11 +283,15 @@ Route::middleware(['auth:staff'])->group(function () {
     Route::post('/staff/transactions/transfer', [TransactionController::class, 'transfer'])->name('staff.transfer');
 
     // Supervisor Approvals
-    Route::get('/staff/approvals', [\App\Http\Controllers\ApprovalController::class, 'index'])->name('staff.approvals');
-    Route::post('/staff/approvals/bulk-approve', [\App\Http\Controllers\ApprovalController::class, 'bulkApprove'])->name('staff.approvals.bulk-approve');
-    Route::post('/staff/approvals/bulk-reject',  [\App\Http\Controllers\ApprovalController::class, 'bulkReject'])->name('staff.approvals.bulk-reject');
-    Route::post('/staff/approvals/{id}/approve', [\App\Http\Controllers\ApprovalController::class, 'approve'])->name('staff.approvals.approve');
-    Route::post('/staff/approvals/{id}/reject', [\App\Http\Controllers\ApprovalController::class, 'reject'])->name('staff.approvals.reject');
+    Route::middleware('permission:approvals.read')->group(function () {
+        Route::get('/staff/approvals', [\App\Http\Controllers\ApprovalController::class, 'index'])->name('staff.approvals');
+    });
+    Route::middleware('permission:approvals.write')->group(function () {
+        Route::post('/staff/approvals/bulk-approve', [\App\Http\Controllers\ApprovalController::class, 'bulkApprove'])->name('staff.approvals.bulk-approve');
+        Route::post('/staff/approvals/bulk-reject',  [\App\Http\Controllers\ApprovalController::class, 'bulkReject'])->name('staff.approvals.bulk-reject');
+        Route::post('/staff/approvals/{id}/approve', [\App\Http\Controllers\ApprovalController::class, 'approve'])->name('staff.approvals.approve');
+        Route::post('/staff/approvals/{id}/reject',  [\App\Http\Controllers\ApprovalController::class, 'reject'])->name('staff.approvals.reject');
+    });
     // Customer Care Operations
     Route::get('/staff/customer-care/register', [\App\Http\Controllers\CustomerCareController::class, 'create'])->name('staff.customer-care.register');
     Route::post('/staff/customer-care/register', [\App\Http\Controllers\CustomerCareController::class, 'store'])->name('staff.customer-care.store');
@@ -368,50 +372,55 @@ Route::middleware(['auth:staff'])->group(function () {
     Route::post('/staff/my-profile/password', [\App\Http\Controllers\StaffProfileController::class, 'updatePassword'] )->name('staff.profile.password');
     Route::post('/staff/my-profile/avatar',   [\App\Http\Controllers\StaffProfileController::class, 'updateAvatar']   )->name('staff.profile.avatar');
 
-    // Accounting Operations
-    Route::get('/staff/accounting/ledger',        [\App\Http\Controllers\AccountingController::class, 'ledger'])->name('staff.accounting.ledger');
-    Route::get('/staff/accounting/trial-balance', [\App\Http\Controllers\AccountingController::class, 'trialBalance'])->name('staff.accounting.trial-balance');
-    Route::get('/staff/accounting/gl/{id}',       [\App\Http\Controllers\AccountingController::class, 'glDetail'])->name('staff.accounting.gl-detail');
+    // Accounting Operations — restricted to staff with reconciliation access
+    Route::middleware('permission:reconciliation.read')->group(function () {
+        Route::get('/staff/accounting/ledger',        [\App\Http\Controllers\AccountingController::class, 'ledger'])->name('staff.accounting.ledger');
+        Route::get('/staff/accounting/trial-balance', [\App\Http\Controllers\AccountingController::class, 'trialBalance'])->name('staff.accounting.trial-balance');
+        Route::get('/staff/accounting/gl/{id}',       [\App\Http\Controllers\AccountingController::class, 'glDetail'])->name('staff.accounting.gl-detail');
+    });
 
-    // HQ / Super Admin Operations
-    Route::get('/staff/admin/dashboard', [\App\Http\Controllers\AdminController::class, 'dashboard'])->name('staff.admin.dashboard');
-    // Branch Management
-    Route::get('/staff/admin/branches', [\App\Http\Controllers\AdminController::class, 'branchIndex'])->name('staff.admin.branches.index');
-    Route::post('/staff/admin/branches', [\App\Http\Controllers\AdminController::class, 'storeBranch'])->name('staff.admin.branches.store');
-    Route::put('/staff/admin/branches/{id}', [\App\Http\Controllers\AdminController::class, 'updateBranch'])->name('staff.admin.branches.update');
-    Route::post('/staff/admin/branches/{id}/status', [\App\Http\Controllers\AdminController::class, 'updateBranchStatus'])->name('staff.admin.branches.status');
-    Route::post('/staff/admin/branches/{id}/manager', [\App\Http\Controllers\AdminController::class, 'assignBranchManager'])->name('staff.admin.branches.manager');
+    // HQ / Super Admin Operations — all gated behind system.admin permission
+    Route::middleware('permission:system.admin')->group(function () {
+        Route::get('/staff/admin/dashboard', [\App\Http\Controllers\AdminController::class, 'dashboard'])->name('staff.admin.dashboard');
 
-    // Role Management
-    Route::get('/staff/admin/roles', [\App\Http\Controllers\AdminController::class, 'roleIndex'])->name('staff.admin.roles.index');
-    Route::post('/staff/admin/roles', [\App\Http\Controllers\AdminController::class, 'storeRole'])->name('staff.admin.roles.store');
-    Route::put('/staff/admin/roles/{id}', [\App\Http\Controllers\AdminController::class, 'updateRole'])->name('staff.admin.roles.update');
-    Route::post('/staff/admin/roles/permissions', [\App\Http\Controllers\AdminController::class, 'updateRolePermissions'])->name('staff.admin.roles.permissions');
+        // Branch Management
+        Route::get(  '/staff/admin/branches',              [\App\Http\Controllers\AdminController::class, 'branchIndex']       )->name('staff.admin.branches.index');
+        Route::post( '/staff/admin/branches',              [\App\Http\Controllers\AdminController::class, 'storeBranch']       )->name('staff.admin.branches.store');
+        Route::put(  '/staff/admin/branches/{id}',         [\App\Http\Controllers\AdminController::class, 'updateBranch']      )->name('staff.admin.branches.update');
+        Route::post( '/staff/admin/branches/{id}/status',  [\App\Http\Controllers\AdminController::class, 'updateBranchStatus'])->name('staff.admin.branches.status');
+        Route::post( '/staff/admin/branches/{id}/manager', [\App\Http\Controllers\AdminController::class, 'assignBranchManager'])->name('staff.admin.branches.manager');
 
-    // Staff Management
-    Route::get('/staff/admin/staff', [\App\Http\Controllers\AdminController::class, 'staffIndex'])->name('staff.admin.staff.index');
-    Route::post('/staff/admin/staff', [\App\Http\Controllers\AdminController::class, 'storeStaff'])->name('staff.admin.staff.store');
-    Route::put('/staff/admin/staff/{id}', [\App\Http\Controllers\AdminController::class, 'updateStaff'])->name('staff.admin.staff.update');
-    Route::post('/staff/admin/staff/{id}/status', [\App\Http\Controllers\AdminController::class, 'updateStaffStatus'])->name('staff.admin.staff.status');
-    Route::post('/staff/admin/staff/{id}/reset-password', [\App\Http\Controllers\AdminController::class, 'resetStaffPassword'])->name('staff.admin.staff.reset-password');
-    Route::get('/staff/admin/staff/preview-id', [\App\Http\Controllers\AdminController::class, 'previewStaffId'])->name('staff.admin.staff.preview-id');
+        // Role Management
+        Route::get(  '/staff/admin/roles',              [\App\Http\Controllers\AdminController::class, 'roleIndex']          )->name('staff.admin.roles.index');
+        Route::post( '/staff/admin/roles',              [\App\Http\Controllers\AdminController::class, 'storeRole']          )->name('staff.admin.roles.store');
+        Route::put(  '/staff/admin/roles/{id}',         [\App\Http\Controllers\AdminController::class, 'updateRole']         )->name('staff.admin.roles.update');
+        Route::post( '/staff/admin/roles/permissions',  [\App\Http\Controllers\AdminController::class, 'updateRolePermissions'])->name('staff.admin.roles.permissions');
 
-    // Audit Log
-    Route::get('/staff/admin/audit', [\App\Http\Controllers\AdminController::class, 'auditIndex'])->name('staff.admin.audit.index');
+        // Staff Management
+        Route::get(  '/staff/admin/staff/preview-id',       [\App\Http\Controllers\AdminController::class, 'previewStaffId']   )->name('staff.admin.staff.preview-id');
+        Route::get(  '/staff/admin/staff',                   [\App\Http\Controllers\AdminController::class, 'staffIndex']       )->name('staff.admin.staff.index');
+        Route::post( '/staff/admin/staff',                   [\App\Http\Controllers\AdminController::class, 'storeStaff']       )->name('staff.admin.staff.store');
+        Route::put(  '/staff/admin/staff/{id}',              [\App\Http\Controllers\AdminController::class, 'updateStaff']      )->name('staff.admin.staff.update');
+        Route::post( '/staff/admin/staff/{id}/status',       [\App\Http\Controllers\AdminController::class, 'updateStaffStatus'])->name('staff.admin.staff.status');
+        Route::post( '/staff/admin/staff/{id}/reset-password',[\App\Http\Controllers\AdminController::class, 'resetStaffPassword'])->name('staff.admin.staff.reset-password');
 
-    // Settings
-    Route::get('/staff/admin/settings', [\App\Http\Controllers\AdminController::class, 'settingsIndex'])->name('staff.admin.settings.index');
-    Route::post('/staff/admin/settings/account-types', [\App\Http\Controllers\AdminController::class, 'storeAccountType'])->name('staff.admin.settings.account-types.store');
-    Route::put('/staff/admin/settings/account-types/{id}', [\App\Http\Controllers\AdminController::class, 'updateAccountType'])->name('staff.admin.settings.account-types.update');
-    Route::put('/staff/admin/settings/roles/{id}/limit', [\App\Http\Controllers\AdminController::class, 'updateRoleLimit'])->name('staff.admin.settings.role-limit');
+        // Settings
+        Route::get(  '/staff/admin/settings',                   [\App\Http\Controllers\AdminController::class, 'settingsIndex']          )->name('staff.admin.settings.index');
+        Route::post( '/staff/admin/settings/account-types',     [\App\Http\Controllers\AdminController::class, 'storeAccountType']       )->name('staff.admin.settings.account-types.store');
+        Route::put(  '/staff/admin/settings/account-types/{id}',[\App\Http\Controllers\AdminController::class, 'updateAccountType']      )->name('staff.admin.settings.account-types.update');
+        Route::put(  '/staff/admin/settings/roles/{id}/limit',  [\App\Http\Controllers\AdminController::class, 'updateRoleLimit']        )->name('staff.admin.settings.role-limit');
 
-    // Customer Status Control
-    Route::get('/staff/admin/customers', [\App\Http\Controllers\AdminController::class, 'customerIndex'])->name('staff.admin.customers.index');
-    Route::post('/staff/admin/customers/{id}/status', [\App\Http\Controllers\AdminController::class, 'updateCustomerStatus'])->name('staff.admin.customers.status');
+        // Customer Status & Portal Access
+        Route::get(  '/staff/admin/customers',                [\App\Http\Controllers\AdminController::class, 'customerIndex']       )->name('staff.admin.customers.index');
+        Route::post( '/staff/admin/customers/{id}/status',    [\App\Http\Controllers\AdminController::class, 'updateCustomerStatus'])->name('staff.admin.customers.status');
+        Route::get(  '/staff/admin/portal-access',            [\App\Http\Controllers\AdminController::class, 'portalAccessIndex']   )->name('staff.admin.portal-access.index');
+        Route::post( '/staff/admin/portal-access/bulk-send',  [\App\Http\Controllers\AdminController::class, 'bulkSendPortalAccess'])->name('staff.admin.portal-access.bulk-send');
+    });
 
-    // Customer Portal Access Management
-    Route::get('/staff/admin/portal-access',            [\App\Http\Controllers\AdminController::class, 'portalAccessIndex'])->name('staff.admin.portal-access.index');
-    Route::post('/staff/admin/portal-access/bulk-send', [\App\Http\Controllers\AdminController::class, 'bulkSendPortalAccess'])->name('staff.admin.portal-access.bulk-send');
+    // Audit log — readable by anyone with audit.read (Super Admin, Branch Manager, Compliance, Auditor)
+    Route::middleware('permission:audit.read')->group(function () {
+        Route::get('/staff/admin/audit', [\App\Http\Controllers\AdminController::class, 'auditIndex'])->name('staff.admin.audit.index');
+    });
 
 });
 

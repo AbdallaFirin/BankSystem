@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\LedgerEntry;
 use App\Models\PendingApproval;
 use App\Models\Staff;
 use App\Models\Transaction;
@@ -22,27 +23,43 @@ class ApprovalController extends Controller
         $staff = Auth::guard('staff')->user();
 
         /* ── Pending queue ── */
-        $pending = Transaction::with(['initiator', 'primaryAccount.customer', 'secondaryAccount.customer'])
+        $pendingTxns = Transaction::with(['initiator.role', 'primaryAccount.customer', 'secondaryAccount.customer'])
             ->where('status', 'pending_approval')
             ->where('branch_id', $staff->branch_id)
             ->orderByDesc('created_at')
-            ->get()
-            ->map(fn($tx) => [
-                'id'             => $tx->id,
-                'reference'      => $tx->reference,
-                'type'           => $tx->type,
-                'amount'         => $tx->amount,
-                'created_at'     => $tx->created_at,
-                'initiated_by'   => $tx->initiator?->full_name ?? '—',
-                'initiator_role' => $tx->initiator?->role?->role_name ?? '—',
-                'account_number'    => $tx->primaryAccount?->account_number ?? '—',
-                'customer_name'     => $tx->primaryAccount?->customer?->full_name ?? '—',
-                'current_balance'   => $tx->primaryAccount?->balance ?? 0,
-                'to_account_number' => $tx->type === 'transfer'
-                    ? ($tx->secondaryAccount?->account_number ?? '—') : null,
-                'to_customer_name'  => $tx->type === 'transfer'
-                    ? ($tx->secondaryAccount?->customer?->full_name ?? '—') : null,
-            ]);
+            ->get();
+
+        // Compute live balances for all involved accounts in one query
+        // (accounts table has no balance column — balances live in ledger_entries)
+        $accountIds = $pendingTxns
+            ->flatMap(fn($tx) => array_filter([
+                $tx->primaryAccount?->id,
+                $tx->secondaryAccount?->id,
+            ]))
+            ->unique()
+            ->values();
+
+        $balances = LedgerEntry::whereIn('account_id', $accountIds)
+            ->selectRaw('account_id, SUM(CASE WHEN entry_type = "credit" THEN amount ELSE -amount END) as balance')
+            ->groupBy('account_id')
+            ->pluck('balance', 'account_id');
+
+        $pending = $pendingTxns->map(fn($tx) => [
+            'id'             => $tx->id,
+            'reference'      => $tx->reference,
+            'type'           => $tx->type,
+            'amount'         => $tx->amount,
+            'created_at'     => $tx->created_at,
+            'initiated_by'   => $tx->initiator?->full_name ?? '—',
+            'initiator_role' => $tx->initiator?->role?->role_name ?? '—',
+            'account_number'    => $tx->primaryAccount?->account_number ?? '—',
+            'customer_name'     => $tx->primaryAccount?->customer?->full_name ?? '—',
+            'current_balance'   => (float) ($balances[$tx->primaryAccount?->id] ?? 0),
+            'to_account_number' => $tx->type === 'transfer'
+                ? ($tx->secondaryAccount?->account_number ?? '—') : null,
+            'to_customer_name'  => $tx->type === 'transfer'
+                ? ($tx->secondaryAccount?->customer?->full_name ?? '—') : null,
+        ]);
 
         /* ── Decision history (decisions made by this supervisor) ── */
         $history = PendingApproval::with(['transaction.primaryAccount.customer', 'transaction.secondaryAccount.customer', 'transaction.initiator'])
