@@ -22,6 +22,7 @@ done
 echo "✓  MySQL is ready."
 
 # ── 2. Composer install ───────────────────────────────────────────────────────
+# Check autoload.php — vendor/ dir exists (named volume) but may be empty.
 if [ ! -f vendor/autoload.php ]; then
     echo "📦  Running composer install..."
     composer install --no-dev --optimize-autoloader --no-interaction
@@ -31,7 +32,9 @@ else
 fi
 
 # ── 3. NPM install + build ────────────────────────────────────────────────────
-if [ ! -d public/build ]; then
+# Check for manifest.json specifically — the build/ directory always exists
+# (it is a named Docker volume mount) but may be empty on first run.
+if [ ! -f public/build/manifest.json ]; then
     echo "🔨  Running npm install && npm run build..."
     npm ci --prefer-offline 2>/dev/null || npm install
     npm run build
