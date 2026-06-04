@@ -34,14 +34,9 @@
 <body>
 <div class="wrapper">
   <div class="header">
-    @php
-      $logoPath = public_path('images/MAin Logo.png');
-      $logoSrc  = file_exists($logoPath)
-          ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath))
-          : '';
-    @endphp
-    @if($logoSrc)
-      <img src="{{ $logoSrc }}" alt="Gobaad Bank" />
+    @php $logoPath = public_path('images/MAin Logo.png'); @endphp
+    @if(file_exists($logoPath))
+      <img src="{{ $message->embed($logoPath) }}" alt="Gobaad Bank" />
     @endif
     <h1>Gobaad Bank</h1>
     <p>{{ $headerTag ?? 'Official Notification' }}</p>
