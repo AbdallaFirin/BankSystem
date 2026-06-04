@@ -76,13 +76,6 @@ services:
       MAIL_FROM_ADDRESS: cfriin7@gmail.com
       MAIL_FROM_NAME: "Gobaad Bank"
       BCRYPT_ROUNDS: 12
-    # PHP-FPM is ready when its master process is running
-    healthcheck:
-      test: ["CMD-SHELL", "pgrep -x php-fpm > /dev/null || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-      start_period: 150s
     networks:
       - gobaad_net
     restart: unless-stopped
@@ -130,7 +123,7 @@ services:
       mysql:
         condition: service_healthy
       app:
-        condition: service_healthy
+        condition: service_started
     environment:
       APP_KEY: base64:5k3EeWqEMkYtmEQhz01IRrfrpapKW3C7fporPBR6/aY=
       DB_HOST: mysql
