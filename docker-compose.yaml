@@ -7,6 +7,7 @@ services:
     build:
       context: .
       dockerfile: Docker/nginx/dockerfile
+    image: ghcr.io/abdallafirin/banksystem-nginx:latest
     pull_policy: build
     container_name: gobaad_nginx
     ports:
@@ -29,6 +30,7 @@ services:
     build:
       context: .
       dockerfile: Docker/php/dockerfile
+    image: ghcr.io/abdallafirin/banksystem-app:latest
     pull_policy: build
     container_name: gobaad_app
     volumes:
@@ -115,6 +117,7 @@ services:
     build:
       context: .
       dockerfile: Docker/php/dockerfile
+    image: ghcr.io/abdallafirin/banksystem-app:latest
     pull_policy: build
     container_name: gobaad_reverb
     command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080", "--no-interaction"]
