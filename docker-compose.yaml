@@ -1,10 +1,11 @@
 services:
 
   nginx:
+    image: ghcr.io/abdallafirin/banksystem-nginx:latest
     build:
-      context: .
-      dockerfile: Docker/nginx/Dockerfile
-    pull_policy: build
+      context: ./Docker/nginx
+      dockerfile: Dockerfile
+    pull_policy: always
     container_name: gobaad_nginx
     ports:
       - "8000:80"
@@ -19,10 +20,11 @@ services:
     restart: unless-stopped
 
   app:
+    image: ghcr.io/abdallafirin/banksystem-app:latest
     build:
-      context: .
-      dockerfile: Docker/php/Dockerfile
-    pull_policy: build
+      context: ./Docker/php
+      dockerfile: Dockerfile
+    pull_policy: always
     container_name: gobaad_app
     volumes:
       - .:/var/www/html
@@ -103,10 +105,11 @@ services:
     restart: unless-stopped
 
   reverb:
+    image: ghcr.io/abdallafirin/banksystem-app:latest
     build:
-      context: .
-      dockerfile: Docker/php/Dockerfile
-    pull_policy: build
+      context: ./Docker/php
+      dockerfile: Dockerfile
+    pull_policy: always
     container_name: gobaad_reverb
     command: php artisan reverb:start --host=0.0.0.0 --port=8080 --no-interaction
     ports:

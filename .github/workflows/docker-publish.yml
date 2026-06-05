@@ -1,0 +1,54 @@
+name: Build & Push Docker Images
+
+on:
+  push:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: abdallafirin
+
+jobs:
+  build-app:
+    name: Build PHP app image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./Docker/php
+          file: Docker/php/Dockerfile
+          push: true
+          tags: ghcr.io/abdallafirin/banksystem-app:latest
+
+  build-nginx:
+    name: Build Nginx image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./Docker/nginx
+          file: Docker/nginx/Dockerfile
+          push: true
+          tags: ghcr.io/abdallafirin/banksystem-nginx:latest

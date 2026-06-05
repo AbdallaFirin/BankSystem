@@ -43,7 +43,7 @@ RUN echo "upload_max_filesize = 20M"  >> /usr/local/etc/php/conf.d/app.ini \
  && echo "max_execution_time = 120"   >> /usr/local/etc/php/conf.d/app.ini
 
 # ── Entrypoint ────────────────────────────────────────────────────────────────
-COPY Docker/php/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 9000
