@@ -7,6 +7,7 @@ services:
     build:
       context: .
       dockerfile: Docker/nginx/dockerfile
+    pull_policy: build
     container_name: gobaad_nginx
     ports:
       - "8000:80"
@@ -28,6 +29,7 @@ services:
     build:
       context: .
       dockerfile: Docker/php/dockerfile
+    pull_policy: build
     container_name: gobaad_app
     volumes:
       - .:/var/www/html
@@ -113,6 +115,7 @@ services:
     build:
       context: .
       dockerfile: Docker/php/dockerfile
+    pull_policy: build
     container_name: gobaad_reverb
     command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080", "--no-interaction"]
     ports:
