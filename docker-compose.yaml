@@ -1,8 +1,5 @@
 services:
 
-  # ────────────────────────────────────────────────────────────────
-  # Nginx — web server / reverse proxy
-  # ────────────────────────────────────────────────────────────────
   nginx:
     build:
       context: .
@@ -16,15 +13,11 @@ services:
       - vendor_data:/var/www/html/vendor
       - build_data:/var/www/html/public/build
     depends_on:
-      app:
-        condition: service_started   # 502 page handles timing; no deadlock
+      - app
     networks:
       - gobaad_net
     restart: unless-stopped
 
-  # ────────────────────────────────────────────────────────────────
-  # PHP-FPM — Laravel application
-  # ────────────────────────────────────────────────────────────────
   app:
     build:
       context: .
@@ -38,10 +31,98 @@ services:
       - build_data:/var/www/html/public/build
     environment:
       APP_NAME: "Gobaad Bank"
-      APP_ENV: local
+      APP_ENV: production
       APP_KEY: base64:5k3EeWqEMkYtmEQhz01IRrfrpapKW3C7fporPBR6/aY=
-      APP_DEBUG: "true"
-      APP_URL: http://localhost:8000
+      APP_DEBUG: "false"
+      APP_URL: https://gobaadbank.wattco.so
+      APP_LOCALE: en
+
+      LOG_CHANNEL: stack
+      LOG_LEVEL: error
+
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: BankSystem
+      DB_USERNAME: gobaad
+      DB_PASSWORD: gobaad_pass
+
+      SESSION_DRIVER: file
+      SESSION_LIFETIME: 10
+      SESSION_ENCRYPT: "false"
+      SESSION_PATH: /
+      SESSION_DOMAIN: "null"
+      CACHE_STORE: file
+      FILESYSTEM_DISK: local
+      QUEUE_CONNECTION: sync
+
+      BROADCAST_CONNECTION: reverb
+      REVERB_APP_ID: gobaad-bank-001
+      REVERB_APP_KEY: gobaad-bank-key
+      REVERB_APP_SECRET: gobaad-bank-secret
+      REVERB_HOST: reverb
+      REVERB_PORT: 8080
+      REVERB_SCHEME: http
+
+      VITE_REVERB_APP_KEY: gobaad-bank-key
+      VITE_REVERB_HOST: gobaadbank.wattco.so
+      VITE_REVERB_PORT: 8080
+      VITE_REVERB_SCHEME: http
+
+      MAIL_MAILER: smtp
+      MAIL_SCHEME: tls
+      MAIL_HOST: smtp.gmail.com
+      MAIL_PORT: 587
+      MAIL_USERNAME: cfriin7@gmail.com
+      MAIL_PASSWORD: "sjen qsjx iwes wfis"
+      MAIL_FROM_ADDRESS: cfriin7@gmail.com
+      MAIL_FROM_NAME: "Gobaad Bank"
+
+      BCRYPT_ROUNDS: 12
+
+    depends_on:
+      - mysql
+    networks:
+      - gobaad_net
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    container_name: gobaad_mysql
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root_secret
+      MYSQL_DATABASE: BankSystem
+      MYSQL_USER: gobaad
+      MYSQL_PASSWORD: gobaad_pass
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - gobaad_net
+    restart: unless-stopped
+
+  reverb:
+    build:
+      context: .
+      dockerfile: Docker/php/Dockerfile
+    pull_policy: build
+    container_name: gobaad_reverb
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080 --no-interaction
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/var/www/html
+      - vendor_data:/var/www/html/vendor
+    environment:
+      APP_NAME: "Gobaad Bank"
+      APP_ENV: production
+      APP_KEY: base64:5k3EeWqEMkYtmEQhz01IRrfrpapKW3C7fporPBR6/aY=
+      APP_DEBUG: "false"
+      APP_URL: https://gobaadbank.wattco.so
+
+      LOG_CHANNEL: stack
+      LOG_LEVEL: error
 
       DB_CONNECTION: mysql
       DB_HOST: mysql
@@ -59,104 +140,23 @@ services:
       REVERB_APP_ID: gobaad-bank-001
       REVERB_APP_KEY: gobaad-bank-key
       REVERB_APP_SECRET: gobaad-bank-secret
-      REVERB_HOST: reverb
-      REVERB_PORT: 8080
-      REVERB_SCHEME: http
-
-      VITE_REVERB_APP_KEY: gobaad-bank-key
-      VITE_REVERB_HOST: localhost
-      VITE_REVERB_PORT: 8080
-      VITE_REVERB_SCHEME: http
-
-      MAIL_MAILER: smtp
-      MAIL_HOST: smtp.gmail.com
-      MAIL_PORT: 587
-      MAIL_USERNAME: cfriin7@gmail.com
-      MAIL_PASSWORD: "sjen qsjx iwes wfis"
-      MAIL_FROM_ADDRESS: cfriin7@gmail.com
-      MAIL_FROM_NAME: "Gobaad Bank"
-      BCRYPT_ROUNDS: 12
-    networks:
-      - gobaad_net
-    restart: unless-stopped
-
-  # ────────────────────────────────────────────────────────────────
-  # MySQL 8 — database
-  # ────────────────────────────────────────────────────────────────
-  mysql:
-    image: mysql:8.0
-    container_name: gobaad_mysql
-    ports:
-      - "3307:3306"        # 3307 on host so it doesn't clash with a local MySQL
-    environment:
-      MYSQL_ROOT_PASSWORD: root_secret
-      MYSQL_DATABASE: BankSystem
-      MYSQL_USER: gobaad
-      MYSQL_PASSWORD: gobaad_pass
-    volumes:
-      - mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_secret"]
-      interval: 5s
-      timeout: 5s
-      retries: 15
-      start_period: 30s
-    networks:
-      - gobaad_net
-    restart: unless-stopped
-
-  # ────────────────────────────────────────────────────────────────
-  # Laravel Reverb — WebSocket server (real-time feed)
-  # ────────────────────────────────────────────────────────────────
-  reverb:
-    build:
-      context: .
-      dockerfile: Docker/php/Dockerfile
-    pull_policy: build
-    container_name: gobaad_reverb
-    command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080", "--no-interaction"]
-    ports:
-      - "8080:8080"
-    volumes:
-      - .:/var/www/html
-      - vendor_data:/var/www/html/vendor
-    depends_on:
-      app:
-        condition: service_started
-    environment:
-      APP_KEY: base64:5k3EeWqEMkYtmEQhz01IRrfrpapKW3C7fporPBR6/aY=
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_DATABASE: BankSystem
-      DB_USERNAME: gobaad
-      DB_PASSWORD: gobaad_pass
-      BROADCAST_CONNECTION: reverb
-      REVERB_APP_ID: gobaad-bank-001
-      REVERB_APP_KEY: gobaad-bank-key
-      REVERB_APP_SECRET: gobaad-bank-secret
       REVERB_HOST: 0.0.0.0
       REVERB_PORT: 8080
       REVERB_SCHEME: http
+
+    depends_on:
+      - mysql
+      - app
     networks:
       - gobaad_net
     restart: unless-stopped
 
-# ────────────────────────────────────────────────────────────────
-# Named volumes — persists vendor/, node_modules/, build/, DB data
-# ────────────────────────────────────────────────────────────────
-volumes:
-  mysql_data:
-    driver: local
-  vendor_data:
-    driver: local
-  node_modules_data:
-    driver: local
-  build_data:
-    driver: local
-
-# ────────────────────────────────────────────────────────────────
-# Network
-# ────────────────────────────────────────────────────────────────
 networks:
   gobaad_net:
     driver: bridge
+
+volumes:
+  mysql_data:
+  vendor_data:
+  node_modules_data:
+  build_data:
