@@ -36,9 +36,6 @@ services:
       - vendor_data:/var/www/html/vendor
       - node_modules_data:/var/www/html/node_modules
       - build_data:/var/www/html/public/build
-    depends_on:
-      mysql:
-        condition: service_healthy
     environment:
       APP_NAME: "Gobaad Bank"
       APP_ENV: local
@@ -124,8 +121,6 @@ services:
       - .:/var/www/html
       - vendor_data:/var/www/html/vendor
     depends_on:
-      mysql:
-        condition: service_healthy
       app:
         condition: service_started
     environment:
